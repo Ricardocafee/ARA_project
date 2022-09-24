@@ -1,9 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
  
 // Define the maximum number of vertices in the graph
 #define N 40
 #define MAX_EDGES 100
+#define SIZE 10000 //Size of the FIFO
+
+void enqueue(int item);
+bool dequeue ();
+
+int nodes_count = 0;
+int Rear = -1;
+int Front = -1;
+int inp_arr[SIZE];
  
 // Data structure to store a graph object
 struct Graph
@@ -63,13 +73,16 @@ struct Graph* createGraph(struct Edge edges[], int n)
 // Function to print adjacency list representation of a graph
 void printGraph(struct Graph* graph)
 {
+
     for (int i = 0; i < N; i++)
     {
         // print current vertex and all its neighbors
         struct Node* ptr = graph->head[i];
+        nodes_count++;
 
 
         if(ptr==NULL && i > 0) break;
+
 
         while (ptr != NULL)
         {
@@ -139,6 +152,101 @@ int readFile(struct Edge edges[])
     return line;
     
 }
+
+void enqueue(int item)
+{
+    if(Rear == SIZE - 1){
+        printf("Overflow \n");
+    } 
+    else
+    {
+        if (Front == -1)
+            {
+                Front = 0;
+            }
+
+        Rear = Rear + 1;
+        inp_arr[Rear] = item;
+    }
+
+}
+
+bool dequeue(){
+    if (Front == -1 || Front > Rear){
+       // printf("Underflow\n");
+        return true;
+    }
+    else
+    {
+        Front = Front + 1;
+        return false;
+    }
+}
+
+
+bool isReachable(int s, int d, struct Graph* graph){
+
+    //Source is the same as destination
+    if(s == d){
+        return true;
+    }
+
+    bool visited[nodes_count];
+
+    for(int i = 0; i < nodes_count; i++){
+        visited[i] = false;
+    }
+
+    visited[s] = true;
+
+    struct Node* ptr;
+    int current_node;
+
+    enqueue(s);
+
+    while(1)
+    {
+        current_node = inp_arr[Front];
+        //printf("Current node: %d\n", current_node);
+
+        if (ptr = graph->head[current_node])
+        {
+            //printf("Visited node: %d\n", ptr->dest);
+        }
+        else
+        {
+            if(dequeue())
+            {
+                return false;
+            }
+            continue;
+        }
+        
+    
+        while (ptr != NULL)
+            {
+                //printf("Visited (yes or no) - %d\n", visited[ptr->dest]);
+                if(visited[ptr->dest] == false)
+                {
+                    
+                    if (ptr->dest == d)
+                    {
+                        return true;
+                    }
+                    
+                    enqueue(ptr->dest);               
+                }
+
+                ptr = ptr->next;
+            }
+
+        if(dequeue())
+        {
+            return false;
+        }
+    }
+
+}
  
 // Directed graph implementation in C
 int main(void)
@@ -153,6 +261,17 @@ int main(void)
  
     // Function to print adjacency list representation of a graph
     printGraph(graph);
+
+    bool btt = isReachable(1,2,graph);
+
+    if(btt)
+    {
+        printf("\nIt is reachable\n");
+    }
+    else
+    {
+        printf("\nIt is not reachable\n");
+    }
  
     return 0;
 }
