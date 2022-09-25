@@ -10,10 +10,11 @@
 void enqueue(int item);
 bool dequeue ();
 
-int nodes_count = 0;
-int Rear = -1;
-int Front = -1;
-int inp_arr[SIZE];
+int nodes_count = 0; //Number of nodes
+int Rear = -1; //index of top of the FIFO
+int Front = -1; //index of bottom of the FIFO
+int inp_arr[SIZE]; //FIFO
+int no_solutions=0;
  
 // Data structure to store a graph object
 struct Graph
@@ -25,7 +26,7 @@ struct Graph
 // Data structure to store adjacency list nodes of the graph
 struct Node
 {
-    int dest, weight, length;
+    int dest, weight, length, depth;
     struct Node* next;
 };
  
@@ -33,6 +34,8 @@ struct Node
 struct Edge {
     int src, dest, weight, length;
 };
+
+struct Graph *graph;
  
 // Function to create an adjacency list from specified edges
 struct Graph* createGraph(struct Edge edges[], int n)
@@ -53,12 +56,14 @@ struct Graph* createGraph(struct Edge edges[], int n)
         int dest = edges[i].dest;
         int weight = edges[i].weight;
         int length = edges[i].length;
+        int depth = 0;
  
         // allocate a new node of adjacency list from src to dest
         struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
         newNode->dest = dest;
         newNode->weight = weight;
         newNode->length = length;
+        newNode->depth = depth;
  
         // point new node to the current head
         newNode->next = graph->head[src];
@@ -71,18 +76,18 @@ struct Graph* createGraph(struct Edge edges[], int n)
 }
  
 // Function to print adjacency list representation of a graph
-void printGraph(struct Graph* graph)
+void printGraph()
 {
 
     for (int i = 0; i < N; i++)
     {
         // print current vertex and all its neighbors
         struct Node* ptr = graph->head[i];
-        nodes_count++;
 
 
         if(ptr==NULL && i > 0) break;
 
+        nodes_count++;
 
         while (ptr != NULL)
         {
@@ -183,69 +188,150 @@ bool dequeue(){
     }
 }
 
+int RecursiveFunction(int s, int d, bool visited[]){
 
-bool isReachable(int s, int d, struct Graph* graph){
-
-    //Source is the same as destination
-    if(s == d){
-        return true;
+    if(s == d)
+    {
+        no_solutions++;                         
+        return 1;
     }
+    
 
+    struct Node* current_node = graph->head[s];
+    visited[s] = true;
+    int check=0;
+    bool path_exists = false;
+
+
+    while (current_node != NULL)
+            {
+                if(visited[current_node->dest] == false){
+                    check = RecursiveFunction(current_node->dest, d, visited);
+                }
+
+                if(check>0)
+                    {
+                        path_exists = true;
+                        
+                        if(check > current_node->depth)
+                            {
+                                graph->head[s]->depth = check;
+                            }
+                        printf("Source - %d, current_node depth: %d, out-neighbor - %d\n",s,current_node->depth,current_node->dest);
+                        
+                    }
+                current_node = current_node->next;
+            }
+    if(path_exists) return check+1;
+    return 0;
+
+}
+
+
+int isReachable(int s, int d){
+
+
+    //Vector with length equal to the number of nodes
     bool visited[nodes_count];
 
+    //Initialization of vector
     for(int i = 0; i < nodes_count; i++){
         visited[i] = false;
     }
 
-    visited[s] = true;
+
+    int path_check;
+
+    path_check = RecursiveFunction(s,d,visited);
 
     struct Node* ptr;
     int current_node;
+    
+    if(path_check > 0) return true;
 
-    enqueue(s);
+    return false;
+}
 
-    while(1)
+void merge (int arr[], int l, int m, int r)
+{
+    int i, j, k;
+    int n1 = m - l + 1;
+    int n2 = r -m;
+
+
+    //Create temp arrays
+    int L[n1];
+    int R[n2];
+
+    int low = arr[l];
+    int high = arr[r];
+
+    //Copy data to temp array
+    for(i = 0; i < n1; i++)
     {
-        current_node = inp_arr[Front];
-        //printf("Current node: %d\n", current_node);
+        L[i] = arr[l+i];       
+    }
+    for(j = 0; j < n2; j++)
+    {
+        R[j] = arr[m+1+j];
+    }
 
-        if (ptr = graph->head[current_node])
+    //Merge the temp arrays
+    i = 0;
+    j = 0;
+    k = l;
+
+    while(i < n1 && j < n2)
+    {
+        if (graph->head[L[i]]->depth <= graph->head[R[j]]->depth)
         {
-            //printf("Visited node: %d\n", ptr->dest);
+            arr[k] = L[i];
+            i++;
         }
         else
         {
-            if(dequeue())
-            {
-                return false;
-            }
-            continue;
+            arr[k] = R[j];
+            j++;           
         }
-        
-    
-        while (ptr != NULL)
-            {
-                //printf("Visited (yes or no) - %d\n", visited[ptr->dest]);
-                if(visited[ptr->dest] == false)
-                {
-                    
-                    if (ptr->dest == d)
-                    {
-                        return true;
-                    }
-                    
-                    enqueue(ptr->dest);               
-                }
-
-                ptr = ptr->next;
-            }
-
-        if(dequeue())
-        {
-            return false;
-        }
+        k++;
     }
 
+    //Copy the remaining element of L[]
+    while(i < n1)
+    {
+        arr[k] = L[i];
+        i++;
+        k++;
+    }
+
+    //Copy the remaining elements of R[]
+    while(j < n2)
+    {
+        arr[k] = R[j];
+        j++;
+        k++;
+    }
+}
+
+void MergeSort(int arr[], int l, int r)
+{
+    int low = arr[l];
+    int high = arr[r];
+
+
+    if(l < r)
+    {
+        
+        //Finding mid element
+        int m = l + (r-l)/2;
+
+        //Recursively sorting both the halves
+        MergeSort(arr, l, m);
+        MergeSort(arr,m+1,r);
+
+        //Merge the array
+        merge(arr, l, m, r);
+    }
 }
  
 // Directed graph implementation in C
@@ -257,21 +343,64 @@ int main(void)
     int n = readFile(edges);
  
     // construct a graph from the given edges
-    struct Graph *graph = createGraph(edges, n);
+    graph = createGraph(edges, n);
  
     // Function to print adjacency list representation of a graph
-    printGraph(graph);
+    printGraph();
 
-    bool btt = isReachable(1,2,graph);
+    int s = 1;
+    int d = 4;
 
-    if(btt)
+    //isReachable function will check if there exists a path from the source to the destination 
+    bool path_exists = isReachable(s,d);
+
+    if(path_exists)
     {
-        printf("\nIt is reachable\n");
+        printf("\nIt is reachable.\n");
     }
     else
     {
         printf("\nIt is not reachable\n");
+        return 0;
     }
+    
+    struct Node* ptr;
+    int ordered_nodes[nodes_count];
+
+    for(int j = 0; j < nodes_count; j++)
+    {
+        ordered_nodes[j]=0;
+    }
+    printf("\nNodes count: %d", nodes_count);
+
+
+    for(int i = nodes_count-1; i > 0; i--){
+        ptr = graph->head[i];
+        printf("\nNode: %d, Degree of node - %d\n", i,ptr->depth);
+
+        if(ptr->depth>0) enqueue(i);
+
+    }
+   /* printf("Longest path: %d ", d);
+    for(int i = nodes_count-2; i >= 0; i--){
+        if(ordered_nodes[i]>0){
+            enqueue(i);
+            printf("<- %d ", ordered_nodes[i]);
+        }
+    }
+    */
+
+    printf("Rear - %d", Rear);
+
+    MergeSort(inp_arr, 0, Rear);
+
+    for (int i = 0; i < 3; i++)
+    {
+        printf("\n%d",inp_arr[i]);
+    }
+
+    
+    
  
     return 0;
 }
