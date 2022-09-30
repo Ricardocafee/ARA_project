@@ -3,18 +3,19 @@
 #include <stdbool.h>
  
 // Define the maximum number of vertices in the graph
-#define N 40
+#define N 5000
 #define MAX_EDGES 100
-#define SIZE 10000 //Size of the FIFO
+#define SIZE 5000 //Size of the FIFO
 
-void enqueue(int item);
-bool dequeue ();
+void enqueue(int item);  //Enqueue elements on the stack
+bool dequeue ();  //Dequeue
 
 int nodes_count = 0; //Number of nodes
 int Rear = -1; //index of top of the FIFO
 int Front = -1; //index of bottom of the FIFO
 int inp_arr[SIZE]; //FIFO
 int no_solutions=0;
+bool short_wide = false;  //False - Widest-shortest; True - Shortest-widest
  
 // Data structure to store a graph object
 struct Graph
@@ -26,44 +27,79 @@ struct Graph
 // Data structure to store adjacency list nodes of the graph
 struct Node
 {
-    int dest, weight, length, depth;
+    int dest, width, length;
     struct Node* next;
+};
+
+
+//Will store the status of the node. The most preferred path (width, length) 
+//from the dest (source in routing messages) until it.
+
+//If not visited yet, it will administrate the length and width by the first routing message it received
+///If visisted, a comparison among the links to the out-neighbors will be needed to define the best path
+
+struct width_length  
+{
+    int width, length;   //Width and length attributes
+    bool visited;  
 };
  
 // Data structure to store a graph edge
 struct Edge {
-    int src, dest, weight, length;
+    int src, dest, width, length;
 };
 
-struct Graph *graph;
+
+struct Graph *graph;     //Backwards graph
+struct Graph *graph_out;  //Original graph
+
+struct width_length wl[N];  //Will store the width and length of the best path (According to the order) in the node
+
  
 // Function to create an adjacency list from specified edges
-struct Graph* createGraph(struct Edge edges[], int n)
+struct Graph* createGraph(struct Edge edges[], int n, bool check)
 {
     // allocate storage for the graph data structure
     struct Graph* graph = (struct Graph*)malloc(sizeof(struct Graph));
+  
  
     // initialize head pointer for all vertices
     for (int i = 0; i < N; i++) {
         graph->head[i] = NULL;
+        wl[i].visited=false;
+        wl[i].length=0;
+        wl[i].width=0;
     }
+
+
  
     // add edges to the directed graph one by one
     for (int i = 0; i < n; i++)
     {
+        int src, dest;
         // get the source and destination vertex
-        int src = edges[i].src;
-        int dest = edges[i].dest;
-        int weight = edges[i].weight;
+        //Check is a boolean variable which assigns the creation of the backtrack graph or the original graph
+
+        if(check == false) //If false -> backwards graph
+        {
+            src = edges[i].dest; //Change of direction since routing messages have opposite direction
+            dest = edges[i].src;
+        }
+        else  //If true, original graph
+        {
+            src = edges[i].src; //Maintain the direction of the links
+            dest = edges[i].dest;
+        }
+        
+        int width = edges[i].width;
         int length = edges[i].length;
-        int depth = 0;
+
  
         // allocate a new node of adjacency list from src to dest
         struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
         newNode->dest = dest;
-        newNode->weight = weight;
+        newNode->width = width;
         newNode->length = length;
-        newNode->depth = depth;
  
         // point new node to the current head
         newNode->next = graph->head[src];
@@ -76,22 +112,46 @@ struct Graph* createGraph(struct Edge edges[], int n)
 }
  
 // Function to print adjacency list representation of a graph
-void printGraph()
+void printGraph(int n)
 {
+    //Firstly, the backtrack graph
+    printf("\nBacktrack Graph\n");
 
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < n; i++)
     {
+
         // print current vertex and all its neighbors
         struct Node* ptr = graph->head[i];
 
 
-        if(ptr==NULL && i > 0) break;
+        if(ptr==NULL && i > 0) continue;
 
         nodes_count++;
 
         while (ptr != NULL)
         {
-            printf("%d —> %d (%d,%d)\t", i, ptr->dest, ptr->weight, ptr->length);
+            printf("%d —> %d (%d,%d)\t", i, ptr->dest, ptr->width, ptr->length);
+            ptr = ptr->next;
+        }
+ 
+        printf("\n");
+    }
+
+    //Secondly, the original graph
+    printf("\nOriginal Graph\n");
+
+    for (int i = 0; i < n; i++)
+    {
+
+        // print current vertex and all its neighbors
+        struct Node* ptr = graph_out->head[i];
+
+
+        if(ptr==NULL && i > 0) continue;
+
+        while (ptr != NULL)
+        {
+            printf("%d —> %d (%d,%d)\t", i, ptr->dest, ptr->width, ptr->length);
             ptr = ptr->next;
         }
  
@@ -134,7 +194,7 @@ int readFile(struct Edge edges[])
             edges[line].dest = num;
             break;       
         case 3:
-            edges[line].weight = num;
+            edges[line].width = num;
             break;
         case 4:
             edges[line].length = num;
@@ -158,6 +218,7 @@ int readFile(struct Edge edges[])
     
 }
 
+//Function responsible for enqueuing the elements on the FIFO
 void enqueue(int item)
 {
     if(Rear == SIZE - 1){
@@ -176,162 +237,264 @@ void enqueue(int item)
 
 }
 
+
+//Dequeing the FIFO stack
 bool dequeue(){
     if (Front == -1 || Front > Rear){
        // printf("Underflow\n");
-        return true;
+        return false;
     }
     else
     {
         Front = Front + 1;
-        return false;
+        return true;
     }
 }
 
-int RecursiveFunction(int s, int d, bool visited[]){
 
-    if(s == d)
+//This function will assign the computed length and width of the considerated link in the original graph.
+//It will administrate the concatenation of the information received by the routing message to the head node
+//with the length and width of the link considerated
+
+//Is useful for the current node to decide which is the best path by comparing the links to the out-neighbors
+
+void assign_linkOut(int source, int dest, int length, int width)
+{
+    struct Node* ptr = graph_out->head[source];
+    int d;
+
+    while(ptr != NULL)  //For loop to assign the width and length computed to the right link
     {
-        no_solutions++;                         
-        return 1;
+        d = ptr->dest;
+        if(dest == d)  //Link was found
+        {
+            ptr->length=length;
+            ptr->width=width;
+            break;
+        }
+        ptr=ptr->next;
     }
+}
+
+//Function responsible for comparing the links to the out-neighbors based on the routing messages received
+//and find the best path according to the order choosen (Shortest-widest)
+
+bool compareLinks_sw(int source){  
+
+struct Node* ptr = graph_out->head[source];
+
+    int i = 0;
+    int min_length;
+    int wide_width;
+    int d;
+
+    while(ptr != NULL)
+    {
+        d = ptr->dest;
+        if(wl[d].visited == false) //If that node [d] didn't received any routing message, discard
+        {
+            ptr = ptr->next;
+            continue;
+        }
+
+        if(i == 0) //If it is the first link analyzed, assign its length and width to the node
+        {
+            min_length = ptr->length;
+            wide_width = ptr->width;
+            i = i+1;
+            ptr = ptr->next;
+            continue;
+        }
+
+        //Comparison between links. 
+        if(ptr->width > wide_width)  //Maximum with is prioritized
+        {
+            min_length=ptr->length;
+            wide_width=ptr->width;
+        }
+        else if(ptr->width == wide_width) //In case of equality, choose the shortest one
+        {
+            if(ptr->length < min_length)
+            {
+                min_length = ptr->length;
+            }
+        }
+        ptr = ptr->next;
+    }
+
+
+    //In case any of the attributes was changed, update its state and inform the in-neighbors
+
+    if(wl[source].length != min_length || wl[source].width != wide_width)
+    {
+        wl[source].length = min_length;
+        wl[source].width = wide_width;
+        return true;
+    }
+    else return false; //Otherwise, state will remain the same
+}
+
+//Function responsible for comparing the links to the out-neighbors based on the routing messages received
+//and find the best path according to the order choosen (Widest-shortest)
+
+bool compareLinks_ws(int source){
+
+struct Node* ptr = graph_out->head[source];
+
+    int i = 0;
+    int min_length;
+    int wide_width;
+    int d;
+
+    while(ptr != NULL)
+    {
+        d = ptr->dest;
+        if(wl[d].visited == false) //If that node [d] didn't received any routing message, discard
+        {
+            ptr = ptr->next;
+            continue;
+        }
+
+        if(i == 0)  //If it is the first link analyzed, assign its length and width to the node
+        {
+            min_length = ptr->length;
+            wide_width = ptr->width;
+            i = i+1;
+            ptr = ptr->next;
+            continue;
+        }
+
+        //Comparison between links. 
+        if(ptr->length < min_length)  //Shortest path is prioritized
+        {
+            min_length=ptr->length;
+            wide_width=ptr->width;
+        }
+        else if(ptr->length == min_length)  //In case of equality, choose the widest one
+        {
+            if(ptr->width > wide_width)
+            {
+                wide_width = ptr->width;
+            }
+        }
+        ptr = ptr->next;
+    }
+
+
+    //Function responsible for comparing the links to the out-neighbors based on the routing messages received
+    //and find the best path according to the order choosen (Widest-shortest)
+
+    if(wl[source].length != min_length || wl[source].width != wide_width)
+    {
+        wl[source].length = min_length;
+        wl[source].width = wide_width;
+        return true;
+    }
+    else return false;
+}
+
+//Main function responsible for the sending and receiving of routing message and state's update of nodes
+
+void shortest_widest(int index, int s, int d){
+
+    struct Node* ptr = graph->head[index];
     
 
-    struct Node* current_node = graph->head[s];
-    visited[s] = true;
-    int check=0;
-    bool path_exists = false;
+    int width_node = wl[index].width;  //Width of the node computed based on the links to the out-neighbors
+    int length_node = wl[index].length; //Length of the node computed based on the links to the out-neighbors
+    int compute_width, compute_length=0;  //Variables that will compute the width and length that will be send in the routing messages
+ 
+    wl[s].visited=0;  
+    
 
+    while (ptr != NULL)
+        {
+            int dest = ptr->dest;  //Node which will receive the routing message
+            bool check = false;  //Will verify if status of node has changed
+            compute_length = wl[index].length+ptr->length; //Length's sum between out-neighbor and link
 
-    while (current_node != NULL)
+            //Will compute the with of the path (between out-neighbor and link)
+            if(index == s)
             {
-                if(visited[current_node->dest] == false){
-                    check = RecursiveFunction(current_node->dest, d, visited);
+                compute_width = ptr->width;  //If it is the link from the destination to the previous node
+            }
+            else
+            {
+               
+                if(wl[index].width <= ptr->width)
+                {
+                    
+                    compute_width = wl[index].width;
+                    
+                }
+                else
+                {
+                    compute_width = ptr->width;
+                }
+            }
+            //Assign these parameters to the links of the original graph
+            //Later on, they will be compared to find the best path
+
+            assign_linkOut(dest, index, compute_length, compute_width); 
+
+
+            //If node was not visited yet, administrate the computed length and width of the first routing message
+            if(wl[dest].visited == false) 
+            {
+
+                wl[dest].visited = true;
+                wl[dest].length = compute_length;
+                wl[dest].width = compute_width;
+                
+
+                printf("\n%d -> %d width -> (%d, %d) and (%d, %d)\n",index, dest, compute_width,compute_length, wl[dest].width, wl[dest].length);
+
+                enqueue(dest);      //Added to the queue to be analyzed later
+                ptr = ptr->next;  //Analyze link with the next in-neighbor of the current node
+
+                continue;
+
+            }
+            else
+            {
+                
+                if(short_wide)  //For Shortest_widest order
+                {
+                    check = compareLinks_sw(dest);
+                }
+                else    //For Widest-shortest order
+                {
+                    check = compareLinks_ws(dest);
                 }
 
-                if(check>0)
-                    {
-                        path_exists = true;
-                        
-                        if(check > current_node->depth)
-                            {
-                                graph->head[s]->depth = check;
-                            }
-                        printf("Source - %d, current_node depth: %d, out-neighbor - %d\n",s,current_node->depth,current_node->dest);
-                        
-                    }
-                current_node = current_node->next;
+                if(check) enqueue(dest);  //If status has changed, it needs to informs its in-neighbors
+
+                printf("\n%d -> %d width -> (%d, %d) and (%d, %d)\n",index, dest, compute_width, compute_length, wl[dest].width, wl[dest].length);
+
+                ptr=ptr->next;
+
             }
-    if(path_exists) return check+1;
-    return 0;
-
-}
-
-
-int isReachable(int s, int d){
-
-
-    //Vector with length equal to the number of nodes
-    bool visited[nodes_count];
-
-    //Initialization of vector
-    for(int i = 0; i < nodes_count; i++){
-        visited[i] = false;
-    }
-
-
-    int path_check;
-
-    path_check = RecursiveFunction(s,d,visited);
-
-    struct Node* ptr;
-    int current_node;
+        }
     
-    if(path_check > 0) return true;
 
-    return false;
 }
 
-void merge (int arr[], int l, int m, int r)
-{
-    int i, j, k;
-    int n1 = m - l + 1;
-    int n2 = r -m;
+
+//Function responsible for dequeueing the stack  and send routing messages for all the in-neighbors
+void sendMessages(int source, int dest, int n){
+
+    enqueue(source);
+    bool cont = true;
 
 
-    //Create temp arrays
-    int L[n1];
-    int R[n2];
-
-    int low = arr[l];
-    int high = arr[r];
-
-    //Copy data to temp array
-    for(i = 0; i < n1; i++)
+    while(cont)
     {
-        L[i] = arr[l+i];       
-    }
-    for(j = 0; j < n2; j++)
-    {
-        R[j] = arr[m+1+j];
+        int index = inp_arr[Front]; //Node extracted from Queue
+        shortest_widest(index, source, dest);
+        cont = dequeue();       
     }
 
-    //Merge the temp arrays
-    i = 0;
-    j = 0;
-    k = l;
 
-    while(i < n1 && j < n2)
-    {
-        if (graph->head[L[i]]->depth <= graph->head[R[j]]->depth)
-        {
-            arr[k] = L[i];
-            i++;
-        }
-        else
-        {
-            arr[k] = R[j];
-            j++;           
-        }
-        k++;
-    }
-
-    //Copy the remaining element of L[]
-    while(i < n1)
-    {
-        arr[k] = L[i];
-        i++;
-        k++;
-    }
-
-    //Copy the remaining elements of R[]
-    while(j < n2)
-    {
-        arr[k] = R[j];
-        j++;
-        k++;
-    }
-}
-
-void MergeSort(int arr[], int l, int r)
-{
-    int low = arr[l];
-    int high = arr[r];
-
-
-    if(l < r)
-    {
-        
-        //Finding mid element
-        int m = l + (r-l)/2;
-
-        //Recursively sorting both the halves
-        MergeSort(arr, l, m);
-        MergeSort(arr,m+1,r);
-
-        //Merge the array
-        merge(arr, l, m, r);
-    }
 }
  
 // Directed graph implementation in C
@@ -343,64 +506,34 @@ int main(void)
     int n = readFile(edges);
  
     // construct a graph from the given edges
-    graph = createGraph(edges, n);
+    graph = createGraph(edges, n, false);  //Backtrack graph
+    graph_out = createGraph(edges,n,true);   //Original graph
+
  
-    // Function to print adjacency list representation of a graph
-    printGraph();
+    // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
+    printGraph(n);
 
-    int s = 1;
-    int d = 4;
+    int s = 4;  //Source   (Switched with destination according to the routing messages direction)
+    int d = 1;  //Destination
 
-    //isReachable function will check if there exists a path from the source to the destination 
-    bool path_exists = isReachable(s,d);
+    short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
 
-    if(path_exists)
+    sendMessages(s,d,n);
+
+    if(short_wide) 
     {
-        printf("\nIt is reachable.\n");
+        printf("\n=========================\n");
+        printf("Shortest-widest order\n");
+        printf("=========================\n");
     }
     else
     {
-        printf("\nIt is not reachable\n");
-        return 0;
+        printf("\n=========================");
+        printf("\nWidest-shortest order\n");
+        printf("=========================\n");
     }
-    
-    struct Node* ptr;
-    int ordered_nodes[nodes_count];
+    printf("\nDest %d: (%d,%d)\n",d,wl[d].width, wl[d].length);
 
-    for(int j = 0; j < nodes_count; j++)
-    {
-        ordered_nodes[j]=0;
-    }
-    printf("\nNodes count: %d", nodes_count);
-
-
-    for(int i = nodes_count-1; i > 0; i--){
-        ptr = graph->head[i];
-        printf("\nNode: %d, Degree of node - %d\n", i,ptr->depth);
-
-        if(ptr->depth>0) enqueue(i);
-
-    }
-   /* printf("Longest path: %d ", d);
-    for(int i = nodes_count-2; i >= 0; i--){
-        if(ordered_nodes[i]>0){
-            enqueue(i);
-            printf("<- %d ", ordered_nodes[i]);
-        }
-    }
-    */
-
-    printf("Rear - %d", Rear);
-
-    MergeSort(inp_arr, 0, Rear);
-
-    for (int i = 0; i < 3; i++)
-    {
-        printf("\n%d",inp_arr[i]);
-    }
-
-    
-    
  
     return 0;
 }
