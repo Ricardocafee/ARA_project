@@ -1,0 +1,9 @@
+{
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/home/joaogfguerra/ARA_project",
+            "binaryPath": "/home/joaogfguerra/ARA_project/QoS",
+            "binaryArgs": []
+        }
+    ]
+}
