@@ -7,7 +7,7 @@
  
 // Define the maximum number of vertices in the graph
 #define N 5000
-#define MAX_EDGES 100
+#define MAX_EDGES 1000
 #define SIZE 5000 //Size of the FIFO
 
 void enqueue(int item);  //Enqueue elements on the stack
@@ -20,7 +20,7 @@ int inp_arr[SIZE]; //FIFO
 int no_solutions=0;
 bool short_wide = false;  //False - Widest-shortest; True - Shortest-widest
 
-struct timeval t_initial;
+struct timeval t_initial; 
 
 double uniformDistribution()   //Uniform Distribution for delay
 {
@@ -31,7 +31,7 @@ double uniformDistribution()   //Uniform Distribution for delay
 struct Graph
 {
     // An array of pointers to Node to represent an adjacency list
-    struct Node* head[N];
+    struct Node *head[N];
 };
 
 struct Calendar
@@ -75,20 +75,21 @@ struct Graph *graph;     //Backwards graph
 struct Graph *graph_out;  //Original graph
 struct Calendar *calendar; //Calendar
 
-struct width_length wl[N];  //Will store the width and length of the best path (According to the order) in the node
+struct width_length *wl;  //Will store the width and length of the best path (According to the order) in the node
 
  
 // Function to create an adjacency list from specified edges
 struct Graph* createGraph(struct Edge edges[], int n, bool check)
 {
     // allocate storage for the graph data structure
+    
     struct Graph* graph = (struct Graph*)malloc(sizeof(struct Graph));
   
  
     // initialize head pointer for all vertices
     if(check == false)
     {
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < nodes_count; i++) {
             graph->head[i] = NULL;
             wl[i].visited=false;
             wl[i].length=0;
@@ -266,8 +267,6 @@ void printGraph(int n)
 
         if(ptr==NULL && i > 0) continue;
 
-        nodes_count++;
-
         while (ptr != NULL)
         {
             printf("%d —> %d (%d,%d)\t", i, ptr->dest, ptr->width, ptr->length);
@@ -307,6 +306,7 @@ int readFile(struct Edge edges[])
     char filename[] = "file_input";
     char c; //To store a character read from a file
     int num;
+    int nodes=0;
 
 
     fp = fopen(filename, "r");
@@ -317,12 +317,15 @@ int readFile(struct Edge edges[])
         return 0;
     }
 
+    if(fscanf(fp, " %d", &nodes_count) != 1){
+        printf("Empty file!");
+        return 0;
+    }
+
     //Store values according to their field
 
     while(fscanf(fp, " %d", &num) == 1) {
         count = count + 1;
-
-        if(!num) break;
 
         switch (count)
         {
@@ -389,7 +392,7 @@ void assign_linkOut(int source, int dest, int length, int width)
 
 bool compareLinks_sw(int source){  
 
-struct Node* ptr = graph_out->head[source];
+    struct Node* ptr = graph_out->head[source];
 
     int i = 0;
     int min_length;
@@ -415,7 +418,7 @@ struct Node* ptr = graph_out->head[source];
         }
 
         //Comparison between links. 
-        if(ptr->width > wide_width)  //Maximum with is prioritized
+        if(ptr->width > wide_width)  //Maximum width is prioritized
         {
             min_length=ptr->length;
             wide_width=ptr->width;
@@ -429,7 +432,6 @@ struct Node* ptr = graph_out->head[source];
         }
         ptr = ptr->next;
     }
-
 
     //In case any of the attributes was changed, update its state and inform the in-neighbors
 
@@ -447,7 +449,7 @@ struct Node* ptr = graph_out->head[source];
 
 bool compareLinks_ws(int source){
 
-struct Node* ptr = graph_out->head[source];
+    struct Node* ptr = graph_out->head[source];
 
     int i = 0;
     int min_length;
@@ -518,7 +520,7 @@ int generateTime_inchannel()
 
 //Main function responsible for the sending and receiving of routing message and state's update of nodes
 
-void shortest_widest(int index, int dest, int s, int d){
+void shortest_widest(int index, int dest, int s, int d, int current_time){
 
     struct Node* ptr = graph->head[index];
     struct Node* aux;
@@ -542,7 +544,7 @@ void shortest_widest(int index, int dest, int s, int d){
             bool check = false;  //Will verify if status of node has changed
             compute_length = wl[index].length+ptr->length; //Length's sum between out-neighbor and link
 
-            //Will compute the with of the path (between out-neighbor and link)
+            //Will compute the width of the path (between out-neighbor and link)
             if(index == s)
             {
                 compute_width = ptr->width;  //If it is the link from the destination to the previous node
@@ -570,16 +572,15 @@ void shortest_widest(int index, int dest, int s, int d){
             //If node was not visited yet, administrate the computed length and width of the first routing message
             if(wl[dest].visited == false) 
             {
-
                 wl[dest].visited = true;
                 wl[dest].length = compute_length;
                 wl[dest].width = compute_width;
+                wl[dest].time = current_time;
 
                 aux = graph->head[dest];   //Node that will send the messages
                 while(aux != NULL)
                 {
                     time = generateTime_inchannel();  //Generate time spent in the channel
-
                     addToCalendar(time, aux->dest, dest, wl[dest].width, wl[dest].length);  //Add event to the calendar
                     aux = aux->next; //Add next event
     
@@ -600,13 +601,14 @@ void shortest_widest(int index, int dest, int s, int d){
 
                 if(check)
                 {
-                   aux = graph->head[dest];   //Node that will send the messages
-                   while(aux!=NULL)  
-                   {
+                    wl[dest].time = current_time;
+                    aux = graph->head[dest];   //Node that will send the messages
+                    while(aux!=NULL)  
+                    {
                         time = generateTime_inchannel();   //Generate time
                         addToCalendar(time, aux->dest, dest,wl[dest].width, wl[dest].length);  //Add event to the calendar
                         aux=aux->next;   //next neighbor
-                   }
+                    }
                 }
                 return;
             }
@@ -650,7 +652,7 @@ void sendMessages(int source, int dest_final, int n){
     {
         d = ptr->dest;  //In-neighbor
         time = generateTime_inchannel();  //Time spent in the channel (delay + unit of time)
-        addToCalendar(time, d, source, ptr->width, ptr->length);  //Add event to the calendar
+        addToCalendar(time, d, source, 999999, 0);  //Add event to the calendar
         ptr=ptr->next;  //Next in-neighbor
     }
 
@@ -664,7 +666,7 @@ void sendMessages(int source, int dest_final, int n){
         waitTime(varying_head->time);  //Wait until the next event
         index = varying_head->source;  //Node that will send the message
         d = varying_head->dest;  //Node that will receive the message
-        shortest_widest(index, d,source, dest_final);   //Send message
+        shortest_widest(index, d,source, dest_final, varying_head->time);   //Send message
         varying_head=varying_head->next;  //Next neighbor
     }
 
@@ -686,6 +688,116 @@ void printCalendar()
         ptr=ptr->next;
     }
 
+   
+
+}
+
+void printStatistics(int src)
+{
+
+    printf("\n===========\n");
+    printf("Statistics\n");
+    printf("===========\n\n");
+
+
+    for(int i=0; i < nodes_count ; i++){
+        if(wl[i].time!=0 || i==src){
+            printf("Node %d: , Widht: %d, Lenght: %d, Time: %d ms\n", i, wl[i].width, wl[i].length, wl[i].time);
+        }
+    }
+
+    printf("\n\n");
+
+}
+
+int minWidth(int a, int b)
+{
+    if(b < a){
+        return b;
+    }else{
+        return a;
+    }
+}
+
+int lessLength()
+{
+    int minlength=9999, minnode=0, maxwidth=0;
+
+    for(int i=0; i<nodes_count; i++){
+        if(wl[i].visited==false && wl[i].length < minlength){
+            minlength = wl[i].length;
+            maxwidth = wl[i].width;
+            minnode = i;
+        }else if((wl[i].visited==false) && (wl[i].length == minlength)){
+            if(wl[i].width > maxwidth){
+                minnode = i;
+                maxwidth = wl[i].width;
+            }
+        }
+    }
+
+    return minnode;
+}
+
+
+void printWS(int src, int dest)
+{
+    struct Node* aux;
+
+    //wl reset
+    for(int i = 0 ; i < nodes_count ; i++){
+        wl[i].visited = false;
+        wl[i].length = 99999;
+        wl[i].width = 0;
+        wl[i].prev = NULL;
+    }
+
+    wl[src].length=0;
+    wl[src].width=99999;
+
+    int nodes_left = nodes_count, current = 0;    
+
+    while(nodes_left > 0){
+        current = lessLength();
+        if(current==dest){
+            break;
+        }
+        wl[current].visited=true;
+        nodes_left--;
+        aux = graph->head[current];
+
+        while (aux!=NULL)
+        {
+            if (wl[aux->dest].length > (wl[current].length + aux->length))
+            {
+                wl[aux->dest].length = wl[current].length + aux->length;
+                wl[aux->dest].width = minWidth(wl[current].width, aux->width);
+            }
+            else if((wl[aux->dest].length == (wl[current].length + aux->length)) && (wl[aux->dest].width < minWidth(wl[current].width, aux->length)))
+            {
+                wl[aux->dest].width = minWidth(wl[current].width, aux->width);
+            }
+
+            aux=aux->next;
+            
+        }
+        
+    }
+
+    printf("=========================\n");
+    printf("Widest Shortest Algorithm\n");
+    printf("     Dest %d: (%d,%d)    \n",dest, wl[dest].width, wl[dest].length);
+    printf("==========================\n");
+
+}
+
+void printSW(int src, int dest)
+{
+
+    
+
+
+
 }
 
 
@@ -696,23 +808,24 @@ int main(void)
     //srand(time(NULL));
     struct Edge edges[MAX_EDGES];
     
-
     //Read file and extract number of edges
     int n = readFile(edges);
- 
+
+    wl = (struct width_length*)malloc(nodes_count * sizeof(struct width_length));
+    
     // construct a graph from the given edges
     graph = createGraph(edges, n, false);  //Backtrack graph
-    graph_out = createGraph(edges,n,true);   //Original graph
+    graph_out = createGraph(edges, n, true);   //Original graph
     calendar = initializeCalendar();  //Initialize graph
 
  
     // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
     printGraph(n);
 
-    int s = 4;  //Source   (Switched with destination according to the routing messages direction)
-    int d = 1;  //Destination
+    int s = 3;  //Source   (Switched with destination according to the routing messages direction)
+    int d = 0;  //Destination
 
-    short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
+    short_wide=false;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
 
     sendMessages(s,d,n);  //Function responsible for sending the routing messages
 
@@ -731,5 +844,13 @@ int main(void)
     printf("\nDest %d: (%d,%d)\n",d,wl[d].width, wl[d].length);
 
     printCalendar();
+
+    printStatistics(s);
+
+    printWS(s, d);
+
+
+
+    
     return 0;
 }
