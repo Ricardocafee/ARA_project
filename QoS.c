@@ -176,6 +176,7 @@ void addToCalendar(int time, int dest, int index, int width, int length)
 
     struct width_length* tail = calendar->tail;
     struct width_length* prev_tail;
+    struct width_length* head_ = calendar->head;
 
 
     if(calendar->head == NULL)
@@ -221,8 +222,42 @@ void addToCalendar(int time, int dest, int index, int width, int length)
                 else if(new_node->dest == tail->dest && new_node->source == tail->source)
                 {
                     printf("\nTwo messages in same link\n");
-                    new_node->time=new_node->time+50;
+                    new_node->time=tail->time+50;
                     insertNode(new_node);
+                    return;
+                }
+                else if(tail->prev!=NULL)
+                {
+                    if((new_node->time > tail->prev->time) && (new_node->time < tail->time))
+                    {
+                        insertmiddleNode(new_node, tail, tail->prev);
+                        return;
+                    }
+                    tail = tail->prev;
+                    continue;
+                }
+                else
+                {
+                    tail = tail->prev;
+                    continue;
+                }
+            }
+            else if(tail == calendar->head )
+            {
+                if(new_node->dest==calendar->head->dest && new_node->source==calendar->head->source)
+                {
+                    new_node->prev = calendar->head;
+                    new_node->next = calendar->head->next;
+                    calendar->head->next->prev = new_node;
+                    calendar->head->next=new_node;
+                    return;
+                }
+
+                if(new_node->time < calendar->head->time)
+                {
+                    new_node->next = calendar->head;
+                    calendar->head->prev = new_node;
+                    calendar->head = new_node;
                     return;
                 }
             }
@@ -235,7 +270,7 @@ void addToCalendar(int time, int dest, int index, int width, int length)
             {
 
                 printf("\nTwo messages in same link\n");
-                new_node->time = new_node->time+50;
+                new_node->time = tail->prev->time+50;
                 if(new_node->time >= tail->prev->time)
                 {
                     new_node->time = tail->prev->time - 1;
@@ -309,6 +344,7 @@ int readFile(struct Edge edges[])
     int num;
 
 
+
     fp = fopen(filename, "r");
 
     //Check if file exists
@@ -320,7 +356,13 @@ int readFile(struct Edge edges[])
     //Store values according to their field
 
     while(fscanf(fp, " %d", &num) == 1) {
+        if(line == 0)
+        {
+
+        }
+
         count = count + 1;
+        
 
         if(!num) break;
 
@@ -359,12 +401,11 @@ int readFile(struct Edge edges[])
 }
 
 
-
 //This function will assign the computed length and width of the considerated link in the original graph.
 //It will administrate the concatenation of the information received by the routing message to the head node
 //with the length and width of the link considerated
-
 //Is useful for the current node to decide which is the best path by comparing the links to the out-neighbors
+
 
 void assign_linkOut(int source, int dest, int length, int width)
 {
@@ -508,17 +549,17 @@ int generateTime_inchannel()
     double time_random = uniformDistribution();
     int time_delay = (int) time_random;
 
-    gettimeofday(&t_final, NULL);
-    double _time = (t_final.tv_sec-t_initial.tv_sec)*1000 + (t_final.tv_usec - t_initial.tv_usec)/1000;
-    int time_ = (int) _time;
-    time_ = time_ + time_delay + 1000;
+    //gettimeofday(&t_final, NULL);
+    //double _time = (t_final.tv_sec-t_initial.tv_sec)*1000 + (t_final.tv_usec - t_initial.tv_usec)/1000;
+    //int time_ = (int) _time;
+    int time_ =  time_delay + 1000;
     return time_;
 }
 
 
 //Main function responsible for the sending and receiving of routing message and state's update of nodes
 
-void shortest_widest(int index, int dest, int s, int d){
+void shortest_widest(int index, int dest, int s, int d, int time_){
 
     struct Node* ptr = graph->head[index];
     struct Node* aux;
@@ -530,6 +571,7 @@ void shortest_widest(int index, int dest, int s, int d){
     int width_node = wl[index].width;  //Width of the node computed based on the links to the out-neighbors
     int length_node = wl[index].length; //Length of the node computed based on the links to the out-neighbors
     int compute_width, compute_length=0;  //Variables that will compute the width and length that will be send in the routing messages
+
 
     while (ptr != NULL)
         {   
@@ -579,6 +621,7 @@ void shortest_widest(int index, int dest, int s, int d){
                 while(aux != NULL)
                 {
                     time = generateTime_inchannel();  //Generate time spent in the channel
+                    time= time + time_;
 
                     addToCalendar(time, aux->dest, dest, wl[dest].width, wl[dest].length);  //Add event to the calendar
                     aux = aux->next; //Add next event
@@ -604,6 +647,7 @@ void shortest_widest(int index, int dest, int s, int d){
                    while(aux!=NULL)  
                    {
                         time = generateTime_inchannel();   //Generate time
+                        time = time + time_;
                         addToCalendar(time, aux->dest, dest,wl[dest].width, wl[dest].length);  //Add event to the calendar
                         aux=aux->next;   //next neighbor
                    }
@@ -644,7 +688,7 @@ void sendMessages(int source, int dest_final, int n){
 
     struct Node* ptr = graph->head[source];
     struct width_length* node_extracted;
-    gettimeofday(&t_initial, NULL);  //Save the initial time 
+   // gettimeofday(&t_initial, NULL);  //Save the initial time 
 
     while (ptr!=NULL)  //Initial case: Root node send routinf messages to the in-neighbors
     {
@@ -657,14 +701,16 @@ void sendMessages(int source, int dest_final, int n){
     struct width_length* varying_head = calendar->head; //Ptr that will tranverse the calendar while event are being removed
     
     bool cont = true;
+    int time_;
 
     while(cont) //While nodes are not in a stable state
     {   
         if(varying_head==NULL) break;
-        waitTime(varying_head->time);  //Wait until the next event
+        //waitTime(varying_head->time);  //Wait until the next event
         index = varying_head->source;  //Node that will send the message
         d = varying_head->dest;  //Node that will receive the message
-        shortest_widest(index, d,source, dest_final);   //Send message
+        time_ = varying_head->time;
+        shortest_widest(index, d,source, dest_final, time_);   //Send message
         varying_head=varying_head->next;  //Next neighbor
     }
 
@@ -695,6 +741,7 @@ int main(void)
 {
     //srand(time(NULL));
     struct Edge edges[MAX_EDGES];
+    srand(time(NULL));
     
 
     //Read file and extract number of edges
@@ -709,7 +756,7 @@ int main(void)
     // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
     printGraph(n);
 
-    int s = 4;  //Source   (Switched with destination according to the routing messages direction)
+    int s = 2;  //Source   (Switched with destination according to the routing messages direction)
     int d = 1;  //Destination
 
     short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
