@@ -4,7 +4,8 @@
 #include <sys/time.h>    //To get the interval of time later
 #include <unistd.h>
 #include <time.h>
- 
+#include <math.h>
+
 // Define the maximum number of vertices in the graph
 #define N 5000
 #define MAX_EDGES 100
@@ -719,6 +720,107 @@ void printCalendar()
 
 }
 
+float ComputeMedian(int boxtimes[nodes_count-1])
+{
+    float median;
+
+    if((nodes_count-1)%2)   //Source node does not count
+    {
+        //Odd number of nodes explored       
+        int median_index = (int) floor((nodes_count-1)/2);
+        median = boxtimes[median_index];
+    }
+    else
+    {
+        //Even number of nodes explored
+        int up_median_ind = (int) ceil((nodes_count-1)/2);
+        int low_median_ind = (int) floor((nodes_count-1)/2);
+        median = (boxtimes[up_median_ind]+boxtimes[low_median_ind])/2;
+    }
+
+    return median;
+}
+
+float ComputeQ1andQ3(int boxtimes[nodes_count-1], bool check)
+{
+    //Check informs if it is Q1 or Q3: Q1 -> Check = True; Q3 -> Check = False
+    float Q;
+
+    if((nodes_count-1)%4)   //Source node does not count
+    {
+        //Odd number of nodes explored
+        int q_index;
+
+        if(check){       
+            q_index = (int) floor((nodes_count-1)/4);
+        }
+        else
+        {
+            q_index = (int) floor(3*(nodes_count-1)/4);
+        }
+        Q = boxtimes[q_index];
+    }
+    else
+    {
+        //Even number of nodes explored
+        int up_q_ind;
+        int low_q_ind;
+
+        if(check){       
+            up_q_ind = (int) ceil((nodes_count-1)/4);
+            low_q_ind = (int) floor((nodes_count-1)/4);
+        }
+        else
+        {
+            up_q_ind = (int) ceil(3*(nodes_count-1)/4);
+            low_q_ind = (int) floor(3*(nodes_count-1)/4);
+        }
+
+        Q = (boxtimes[up_q_ind]+boxtimes[low_q_ind])/2;
+    }
+
+    return Q;
+}
+
+void BoxPlot()
+{
+    struct width_length* ptr = calendar->head;
+
+    int box_times[nodes_count-1];
+    int count = 0;
+
+    float median, Q1, Q3; //Boxplot parameters
+    int min, max;
+
+    while(ptr!=NULL)
+    {
+       
+        if(ptr->time == wl[ptr->dest].time)
+        {
+            box_times[count] = ptr->time;
+            count++;
+        }
+        
+        ptr=ptr->next;
+    }
+
+    median = ComputeMedian(box_times);
+    Q1 = ComputeQ1andQ3(box_times, true);  //True tells the function it is Q1
+    Q3 = ComputeQ1andQ3(box_times, false);   //False tells the function it is Q3
+    min = box_times[0];
+    max = box_times[nodes_count-2];
+
+    printf("=========================\n");
+    printf("  Box-Plot Statistics\n");
+    printf("=========================\n");
+    printf("Max: %d\n", max);
+    printf("Q3: %.1f\n", Q3);
+    printf("Median: %.1f\n", median);
+    printf("Q1: %.1f\n", Q1);
+    printf("Min: %d\n\n", min);
+}
+
+
 void printStatistics(int src)
 {
 
@@ -729,7 +831,7 @@ void printStatistics(int src)
 
     for(int i=0; i < nodes_count ; i++){
         if(wl[i].time!=0 || i==src){
-            printf("Node %d: , Widht: %d, Lenght: %d, Time: %d ms\n", i, wl[i].width, wl[i].length, wl[i].time);
+            printf("Node %d: , Width: %d, Length: %d, Time: %d ms\n", i, wl[i].width, wl[i].length, wl[i].time);
         }
     }
 
@@ -821,7 +923,6 @@ void printWS(int src, int dest)
 void printSW(int src, int dest)
 {
 
-    
 
 
 
@@ -854,8 +955,6 @@ int main(void)
     int d = 0;  //Destination
     short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
 
-
-
     sendMessages(s,d,n);  //Function responsible for sending the routing messages
 
     if(short_wide) 
@@ -876,7 +975,10 @@ int main(void)
 
     printStatistics(s);
 
+    BoxPlot();
+
     printWS(s, d);
+
 
     
     return 0;
