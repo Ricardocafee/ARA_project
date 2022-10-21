@@ -720,43 +720,43 @@ void printCalendar()
 
 }
 
-float ComputeMedian(int boxtimes[nodes_count-1])
+float ComputeMedian(int boxtimes[nodes_count-1], int num_nodes)
 {
     float median;
 
-    if((nodes_count-1)%2)   //Source node does not count
+    if((num_nodes)%2)   //Source node does not count
     {
         //Odd number of nodes explored       
-        int median_index = (int) floor((nodes_count-1)/2);
+        int median_index = (int) floor((num_nodes)/2);
         median = boxtimes[median_index];
     }
     else
     {
         //Even number of nodes explored
-        int up_median_ind = (int) ceil((nodes_count-1)/2);
-        int low_median_ind = (int) floor((nodes_count-1)/2);
+        int up_median_ind = (int) floor((num_nodes-1)/2) + 1;
+        int low_median_ind = (int) floor((num_nodes-1)/2);
         median = (boxtimes[up_median_ind]+boxtimes[low_median_ind])/2;
     }
 
     return median;
 }
 
-float ComputeQ1andQ3(int boxtimes[nodes_count-1], bool check)
+float ComputeQ1andQ3(int boxtimes[nodes_count-1], bool check, int num_nodes)
 {
     //Check informs if it is Q1 or Q3: Q1 -> Check = True; Q3 -> Check = False
     float Q;
 
-    if((nodes_count-1)%4)   //Source node does not count
+    if((num_nodes)%4)   //Source node does not count
     {
         //Odd number of nodes explored
         int q_index;
 
         if(check){       
-            q_index = (int) floor((nodes_count-1)/4);
+            q_index = (int) floor((num_nodes)/4);
         }
         else
         {
-            q_index = (int) floor(3*(nodes_count-1)/4);
+            q_index = (int) floor(3*(num_nodes)/4);
         }
         Q = boxtimes[q_index];
     }
@@ -767,13 +767,13 @@ float ComputeQ1andQ3(int boxtimes[nodes_count-1], bool check)
         int low_q_ind;
 
         if(check){       
-            up_q_ind = (int) ceil((nodes_count-1)/4);
-            low_q_ind = (int) floor((nodes_count-1)/4);
+            up_q_ind = (int) floor((num_nodes)/4)+1;
+            low_q_ind = (int) floor((num_nodes)/4);
         }
         else
         {
-            up_q_ind = (int) ceil(3*(nodes_count-1)/4);
-            low_q_ind = (int) floor(3*(nodes_count-1)/4);
+            up_q_ind = (int) floor(3*(num_nodes)/4)+1;
+            low_q_ind = (int) floor(3*(num_nodes)/4);
         }
 
         Q = (boxtimes[up_q_ind]+boxtimes[low_q_ind])/2;
@@ -804,11 +804,11 @@ void BoxPlot()
         ptr=ptr->next;
     }
 
-    median = ComputeMedian(box_times);
-    Q1 = ComputeQ1andQ3(box_times, true);  //True tells the function it is Q1
-    Q3 = ComputeQ1andQ3(box_times, false);   //False tells the function it is Q3
+    median = ComputeMedian(box_times, count);
+    Q1 = ComputeQ1andQ3(box_times, true, count);  //True tells the function it is Q1
+    Q3 = ComputeQ1andQ3(box_times, false, count);   //False tells the function it is Q3
     min = box_times[0];
-    max = box_times[nodes_count-2];
+    max = box_times[count-1];
 
     printf("=========================\n");
     printf("  Box-Plot Statistics\n");
@@ -915,7 +915,7 @@ void printWS(int src, int dest)
 
     printf("=========================\n");
     printf("Widest Shortest Algorithm\n");
-    printf("     Dest %d: (%d,%d)    \n",dest, wl[dest].width, wl[dest].length);
+    printf("  From %d to %d: (%d,%d)    \n",dest, src, wl[dest].width, wl[dest].length);
     printf("==========================\n");
 
 }
@@ -945,40 +945,59 @@ int main(void)
     // construct a graph from the given edges
     graph = createGraph(edges, n, false);  //Backtrack graph
     graph_out = createGraph(edges, n, true);   //Original graph
-    calendar = initializeCalendar();  //Initialize graph
-
- 
+    
     // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
     printGraph(n);
 
-    int s = 3;  //Source   (Switched with destination according to the routing messages direction)
-    int d = 0;  //Destination
-    short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
 
-    sendMessages(s,d,n);  //Function responsible for sending the routing messages
-
-    if(short_wide) 
+    for(int i = 0; i<nodes_count; i++)
     {
-        printf("\n=========================\n");
-        printf("Shortest-widest order\n");
-        printf("=========================\n");
+        for(int j = 0; j<nodes_count; j++)
+        {
+            if(i == j) continue;
+
+            calendar = initializeCalendar();  //Initialize graph
+
+            int s = i;  //Source   (Switched with destination according to the routing messages direction)
+            int d = j;  //Destination
+            short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
+
+            sendMessages(s,d,n);  //Function responsible for sending the routing messages
+
+
+            if((wl[d].length==0 || wl[d].length==99999) && (wl[d].width==0))
+            {
+                printf("\nThere is no path from %d to %d\n", d, s);
+                continue;
+            }
+
+            if(short_wide) 
+            {
+                printf("\n=========================\n");
+                printf("Shortest-widest order\n");
+                printf("=========================\n");
+            }
+            else
+            {
+                printf("\n=========================");
+                printf("\nWidest-shortest order\n");
+                printf("=========================\n");
+            }
+
+
+            printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
+
+
+            printCalendar();
+
+            printStatistics(s);
+
+            BoxPlot();
+
+            printWS(s, d);
+
+        }
     }
-    else
-    {
-        printf("\n=========================");
-        printf("\nWidest-shortest order\n");
-        printf("=========================\n");
-    }
-    printf("\nDest %d: (%d,%d)\n",d,wl[d].width, wl[d].length);
-
-    printCalendar();
-
-    printStatistics(s);
-
-    BoxPlot();
-
-    printWS(s, d);
-
 
     
     return 0;
