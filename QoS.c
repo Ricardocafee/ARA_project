@@ -139,6 +139,18 @@ struct Graph* createGraph(struct Edge edges[], int n, bool check)
     return graph;
 }
 
+struct width_length* initializeNodeStates()
+{
+    for (int i = 0; i < nodes_count; i++) {
+    wl[i].visited=false;
+    wl[i].length=0;
+    wl[i].width=0;
+    wl[i].time = 0;
+    }
+
+    return wl;
+}
+
 struct Calendar* initializeCalendar()  //Initialize Calendar
 {
     struct Calendar* calendar_ = (struct Calendar*)malloc(sizeof(struct Calendar));
@@ -957,6 +969,7 @@ int main(void)
             if(i == j) continue;
 
             calendar = initializeCalendar();  //Initialize graph
+            wl = initializeNodeStates();
 
             int s = i;  //Source   (Switched with destination according to the routing messages direction)
             int d = j;  //Destination
