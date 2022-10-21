@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
 
 // Define the maximum number of vertices in the graph
 #define N 5000
@@ -235,7 +236,7 @@ void addToCalendar(int time, int dest, int index, int width, int length)
                 }
                 else if(new_node->dest == tail->dest && new_node->source == tail->source)
                 {
-                    printf("\nTwo messages in same link\n");
+                    //printf("\nTwo messages in same link\n");
                     new_node->time=tail->time+50;
                     insertNode(new_node);
                     return;
@@ -258,7 +259,8 @@ void addToCalendar(int time, int dest, int index, int width, int length)
             }
             else if(tail == calendar->head )
             {
-                if(new_node->dest==calendar->head->dest && new_node->source==calendar->head->source)
+
+                if((new_node->dest==calendar->head->dest) && (new_node->source==calendar->head->source))
                 {
                     new_node->prev = calendar->head;
                     new_node->next = calendar->head->next;
@@ -266,12 +268,19 @@ void addToCalendar(int time, int dest, int index, int width, int length)
                     calendar->head->next=new_node;
                     return;
                 }
-
-                if(new_node->time < calendar->head->time)
+                else if(new_node->time < calendar->head->time)
                 {
                     new_node->next = calendar->head;
                     calendar->head->prev = new_node;
                     calendar->head = new_node;
+                    return;
+                }
+                else
+                {
+                    new_node->prev = calendar->head;
+                    new_node->next = calendar->head->next;
+                    calendar->head->next->prev = new_node;
+                    calendar->head->next=new_node;
                     return;
                 }
             }
@@ -283,7 +292,7 @@ void addToCalendar(int time, int dest, int index, int width, int length)
             else if((new_node->source == tail->prev->source) && (new_node->dest == tail->prev->dest))
             {
 
-                printf("\nTwo messages in same link\n");
+               // printf("\nTwo messages in same link asdas\n");
                 new_node->time = tail->prev->time+50;
                 if(new_node->time >= tail->prev->time)
                 {
@@ -353,14 +362,18 @@ int readFile(struct Edge edges[])
     FILE *fp;
     int count= 0; //column counter
     int line = 0; //Line counter
-    char filename[] = "file_input";
+    char filename[] = "Abilene.csv";
     char c; //To store a character read from a file
-    int num;
+    char num;
     int nodes=0;
 
 
-
     fp = fopen(filename, "r");
+
+    char buffer[1024];
+    char *token;
+    int row = 0;
+    int column = 0;
 
     //Check if file exists
     if(fp == NULL) {
@@ -375,7 +388,49 @@ int readFile(struct Edge edges[])
 
     //Store values according to their field
 
-    while(fscanf(fp, " %d", &num) == 1) {
+    while(fgets(buffer, 1024, fp))
+    {
+        if(row == 0)
+        {
+            row++;
+            continue;
+        }
+
+        printf("Row: %s", buffer);
+
+        token = strtok(buffer,",");
+        column = 0;
+    
+        while(token != NULL)
+        {
+            printf(" Token: %s\n", token);
+
+            if(column == 0)
+            {
+                edges[row-1].src = atoi(token);
+            }
+            else if(column == 1)
+            {
+                edges[row-1].dest = atoi(token);
+            }
+            else if(column == 2)
+            {
+                edges[row-1].width = atoi(token);
+            }
+            else
+            {
+                edges[row-1].length = atoi(token);
+            }
+
+            column++;
+            
+            token = strtok(NULL, ",");
+        }
+        row++;
+    
+    }
+
+    /*while(fscanf(fp, "%d", &num) == 1) {
 
         count = count + 1;
         
@@ -406,11 +461,11 @@ int readFile(struct Edge edges[])
                 line++;
                 count = 0;
             }
-        }
+        }*/
 
     //Close the file
     fclose(fp);
-    return line;
+    return row-1;
     
 }
 
@@ -717,16 +772,16 @@ void printCalendar()
 {
     struct width_length* ptr = calendar->head;
 
-    printf("\n===========\n");
+    /*printf("\n===========\n");
     printf("Calendar\n");
-    printf("===========\n");
+    printf("===========\n");*/
 
 
-    while(ptr!=NULL)
+    /*while(ptr!=NULL)
     {
         printf("\nSource: %d, Destination: %d, Width: %d, Length: %d, Time: %d\n",ptr->source, ptr->dest, ptr->width, ptr->length, ptr->time);
         ptr=ptr->next;
-    }
+    }*/
 
    
 
@@ -822,23 +877,23 @@ void BoxPlot()
     min = box_times[0];
     max = box_times[count-1];
 
-    printf("=========================\n");
+    /*printf("=========================\n");
     printf("  Box-Plot Statistics\n");
     printf("=========================\n");
     printf("Max: %d\n", max);
     printf("Q3: %.1f\n", Q3);
     printf("Median: %.1f\n", median);
     printf("Q1: %.1f\n", Q1);
-    printf("Min: %d\n\n", min);
+    printf("Min: %d\n\n", min);*/
 }
 
 
 void printStatistics(int src)
 {
 
-    printf("\n===========\n");
+    /*printf("\n===========\n");
     printf("Statistics\n");
-    printf("===========\n\n");
+    printf("===========\n\n");*/
 
 
     for(int i=0; i < nodes_count ; i++){
@@ -925,10 +980,10 @@ void printWS(int src, int dest)
         
     }
 
-    printf("=========================\n");
+    /*printf("=========================\n");
     printf("Widest Shortest Algorithm\n");
     printf("  From %d to %d: (%d,%d)    \n",dest, src, wl[dest].width, wl[dest].length);
-    printf("==========================\n");
+    printf("==========================\n");*/
 
 }
 
@@ -980,25 +1035,25 @@ int main(void)
 
             if((wl[d].length==0 || wl[d].length==99999) && (wl[d].width==0))
             {
-                printf("\nThere is no path from %d to %d\n", d, s);
+                //printf("\nThere is no path from %d to %d\n", d, s);
                 continue;
             }
 
             if(short_wide) 
             {
-                printf("\n=========================\n");
+                /*printf("\n=========================\n");
                 printf("Shortest-widest order\n");
-                printf("=========================\n");
+                printf("=========================\n");*/
             }
             else
             {
-                printf("\n=========================");
+                /*printf("\n=========================");
                 printf("\nWidest-shortest order\n");
-                printf("=========================\n");
+                printf("=========================\n");*/
             }
 
 
-            printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
+           //printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
 
 
             printCalendar();
