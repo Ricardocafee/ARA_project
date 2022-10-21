@@ -615,7 +615,7 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
                 wl[dest].visited = true;
                 wl[dest].length = compute_length;
                 wl[dest].width = compute_width;
-                //wl[dest].time = current_time;
+                wl[dest].time = time_;
 
                 aux = graph->head[dest];   //Node that will send the messages
                 while(aux != NULL)
@@ -661,25 +661,6 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
 
 }
 
-void waitTime(int time)  //Wait until next will come up
-{
-    int sleepTime, time_,wait_time;
-    struct timeval interval_time;
-    double _time;
-
-    sleepTime = time;
-    gettimeofday(&interval_time, NULL);
-    _time = (interval_time.tv_sec-t_initial.tv_sec)*1000 + (interval_time.tv_usec - t_initial.tv_usec)/1000;
-    time_ = (int) _time;
-    wait_time = sleepTime - time_;
-    double in_secs = (double) wait_time/1000;
-    if(wait_time > 0)
-    {
-        printf("\nWaiting %f seconds until next event\n", in_secs);
-        usleep(wait_time*1000);
-    }
-    return;
-}
 
 //Function responsible for sending routing messages for all the in-neighbors
 void sendMessages(int source, int dest_final, int n){
@@ -690,9 +671,8 @@ void sendMessages(int source, int dest_final, int n){
 
     struct Node* ptr = graph->head[source];
     struct width_length* node_extracted;
-   // gettimeofday(&t_initial, NULL);  //Save the initial time 
 
-    while (ptr!=NULL)  //Initial case: Root node send routinf messages to the in-neighbors
+    while (ptr!=NULL)  //Initial case: Root node send routing messages to the in-neighbors
     {
         d = ptr->dest;  //In-neighbor
         time = generateTime_inchannel();  //Time spent in the channel (delay + unit of time)
@@ -897,8 +877,6 @@ int main(void)
     printStatistics(s);
 
     printWS(s, d);
-
-
 
     
     return 0;
