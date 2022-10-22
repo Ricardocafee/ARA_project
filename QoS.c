@@ -1065,7 +1065,7 @@ void printSW(int src, int dest)
     }
 
     wl[src].length=0;
-    wl[src].width=9999;
+    wl[src].width=99999;
 
     int nodes_left = nodes_count, current = 0;    
 
@@ -1214,6 +1214,67 @@ void InterativeModeSW()
     }
 
 }
+
+//Widest shortest stable state
+void printWS_stablestate(int src, int dest)
+{
+    struct Node* aux;
+
+    //wl reset
+    for(int i = 0 ; i < nodes_count ; i++){
+        wl[i].visited = false;
+        wl[i].length = 99999;
+        wl[i].width = 0;
+        wl[i].prev = NULL;
+    }
+
+    wl[src].length=0;
+    wl[src].width=99999;
+
+    int nodes_left = nodes_count, current = 0;    
+
+    while(nodes_left > 0){
+        current = greatestWidth();
+        if(current==dest){
+            break;
+        }
+        wl[current].visited=true;
+        nodes_left--;
+        aux = graph->head[current];
+
+        while (aux!=NULL)
+        {
+            if (wl[aux->dest].width < minWidth(wl[current].width, aux->width))
+            {
+                wl[aux->dest].length = wl[current].length + aux->length;
+                wl[aux->dest].width = minWidth(wl[current].width, aux->width);
+            }
+            else if((wl[aux->dest].width == minWidth(wl[current].width, aux->width)) && (wl[aux->dest].length > (wl[current].length + aux->length)))
+            {
+                wl[aux->dest].length = wl[current].length + aux->length;
+            }
+
+            aux=aux->next;
+            
+        }
+        
+    }
+
+    printf("=========================\n");
+    printf("Shortest Widest Stable State\n");
+    printf("  From %d to %d: (%d,%d)    \n",dest, src, wl[dest].width, wl[dest].length);
+    printf("==========================\n");
+}
+
+//Stable State Algorithm
+void printStableState(int src, int dest)
+{
+    if(short_wide){
+        printWS_stablestate(src, dest);
+    }else{
+        printWS(src,dest);
+    }
+}
  
 // Directed graph implementation in C
 int main(int argc, char *argv[])
@@ -1305,6 +1366,8 @@ int main(int argc, char *argv[])
             printBoxPlot();
 
             printWS(s, d);
+            printStableState(s, d);
+
             printSW(s, d);
 
         }
