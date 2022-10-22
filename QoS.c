@@ -9,7 +9,7 @@
 
 // Define the maximum number of vertices in the graph
 #define N 5000
-#define MAX_EDGES 10000
+#define MAX_EDGES 100000
 #define SIZE 5000 //Size of the FIFO
 
 void enqueue(int item);  //Enqueue elements on the stack
@@ -40,6 +40,11 @@ struct Calendar
 {
     struct width_length* head;   //First event
     struct width_length* tail;  //Last event
+};
+
+struct Box_plot
+{
+    struct box_parameters* head;   //List for box-plot
 };
  
 // Data structure to store adjacency list nodes of the graph
@@ -72,19 +77,20 @@ struct Edge {
     int src, dest, width, length;
 };
 
-
-struct box_plot {
-    int min, max;
-    float q1, q3, median;
+struct box_parameters {
+    int tempo_estab, width_box, length_box;
+    int stored_value;
+    struct box_parameters* next;
 };
 
 
 struct Graph *graph;     //Backwards graph
 struct Graph *graph_out;  //Original graph
 struct Calendar *calendar; //Calendar
+struct Box_plot *list_box; 
 
 struct width_length *wl;  //Will store the width and length of the best path (According to the order) in the node
-struct box_plot* boxplot;
+
 
  
 // Function to create an adjacency list from specified edges
@@ -147,18 +153,6 @@ struct Graph* createGraph(struct Edge edges[], int n, bool check)
     return graph;
 }
 
-struct box_plot* InitializeBoxPlot()
-{
-    struct box_plot* boxplot = (struct box_plot*)malloc(sizeof(struct box_plot));
-
-    boxplot->median = 0;
-    boxplot->q1 = 0;
-    boxplot->q3 = 0;
-    boxplot->max = 0;
-    boxplot->min = 0;
-
-    return boxplot;
-}
 
 struct width_length* initializeNodeStates()
 {
@@ -179,6 +173,14 @@ struct Calendar* initializeCalendar()  //Initialize Calendar
     calendar_->head=NULL;
     calendar_->tail=NULL;
     return calendar_;
+}
+
+struct Box_plot* initializeBoxPlot()
+{
+    struct Box_plot* plot_box = (struct Box_plot*)malloc(sizeof(struct Box_plot));
+
+    plot_box->head=NULL;
+    return plot_box;
 }
 
 void insertNode(struct width_length* new_node)  //Insert node at the end of the calendar
@@ -328,6 +330,119 @@ void addToCalendar(int time, int dest, int index, int width, int length)
         }
     }
 }
+
+void addListBox(int temp_estab, int width_box, int length_box)
+{
+    struct box_parameters* new_node = (struct box_parameters*)malloc(sizeof(struct box_parameters));
+    new_node->tempo_estab=temp_estab;
+    new_node->width_box=width_box;
+    new_node->length_box=length_box;
+    new_node->stored_value = 0;
+    new_node->next=NULL;
+
+
+    if(list_box->head == NULL)
+    {
+        list_box->head = new_node;
+        return;
+    }
+    else
+    {
+        new_node->next = list_box->head;
+        list_box->head = new_node;
+    }
+
+}
+
+void FrontBackSplit(struct box_parameters* source, struct box_parameters** frontRef, struct box_parameters** backRef)
+{
+    struct box_parameters* fast;
+    struct box_parameters *slow;
+
+    slow=source;
+    fast=source->next;
+
+    while(fast!=NULL)
+    {
+        fast = fast->next;
+        if (fast != NULL)
+        {
+            slow = slow->next;
+            fast = fast->next;
+        }
+    }
+
+
+    *frontRef = source;
+    *backRef = slow->next;
+    slow->next = NULL;
+}
+
+struct box_parameters* SortedMerge(struct box_parameters* a, struct box_parameters* b, int i)
+{
+    struct box_parameters* result = NULL;
+
+    
+
+    if(a == NULL)
+    {
+        return b;
+    }
+    else if(b == NULL)
+    {
+    return a;
+    }
+
+    if(i == 0)
+    {
+        a->stored_value=a->tempo_estab;
+        b->stored_value=b->tempo_estab;
+    }
+    else if(i == 1)
+    {
+        a->stored_value=a->width_box;
+        b->stored_value=b->width_box;
+    }
+    else
+    {
+        a->stored_value=a->length_box;
+        b->stored_value=b->length_box;
+    }
+
+    if(a->stored_value <= b->stored_value)
+    {
+        result = a;
+        result->next = SortedMerge(a->next, b , i);
+    }
+    else
+    {
+        result = b;
+        result->next = SortedMerge(a, b->next, i);
+    }
+
+
+    return result;
+}
+
+void MergeSort(struct box_parameters** headRef, int i)
+{
+    struct box_parameters* head = *headRef;
+    struct box_parameters* a;
+    struct box_parameters* b;
+
+    if((head==NULL) || (head->next == NULL))
+    {
+        return;
+    }
+
+    FrontBackSplit(head, &a, &b);
+
+    MergeSort(&a,i);
+    MergeSort(&b,i);
+
+    *headRef = SortedMerge(a,b, i);
+    
+}
  
 // Function to print adjacency list representation of a graph
 void printGraph(int n)
@@ -387,7 +502,7 @@ int readFile(struct Edge edges[], char *filename)
     int nodes=0;
 
 
-    filename = "file_input.csv";
+    filename = "AS1239.csv";
 
 
     fp = fopen(filename, "r");
@@ -786,6 +901,25 @@ void printCalendar()
 
 }
 
+void printListBox()
+{
+    struct box_parameters* ptr = list_box->head;
+
+    printf("\n===========\n");
+    printf(" List-box \n");
+    printf("===========\n");
+
+
+    while(ptr!=NULL)
+    {
+        printf("\n Temp esteb: %d, Width: %d, Length: %d, Stored value: %d",ptr->tempo_estab, ptr->width_box, ptr->length_box, ptr->stored_value);
+        ptr=ptr->next;
+    }
+
+   
+
+}
+
 float ComputeMedian(int boxtimes[nodes_count-1], int num_nodes)
 {
     float median;
@@ -848,39 +982,119 @@ float ComputeQ1andQ3(int boxtimes[nodes_count-1], bool check, int num_nodes)
     return Q;
 }
 
-void BoxPlot()
+
+
+void BoxPlot(int n_pairs, int i)
 {
-    struct width_length* ptr = calendar->head;
+    struct box_parameters* ptr = list_box->head;
 
-    int box_times[nodes_count-1];
-    int count = 0;
+    int count = 1;
 
-    float median, Q1, Q3; //Boxplot parameters
+    int median, Q1, Q3; //Boxplot parameters
     int min, max;
 
-    while(ptr!=NULL)
+    printf("\n===================================\n");
+    printf("  Box Plot: ");
+    if(i == 0)
     {
-       
-        if(ptr->time == wl[ptr->dest].time)
-        {
-            box_times[count] = ptr->time;
-            count++;
-        }
-        
-        ptr=ptr->next;
+        printf("Stabilization Times\n");
+    }
+    else if(i == 1)
+    {
+        printf("Width\n");
+    }
+    else{
+        printf("Length\n");
+    }
+    printf("===================================\n");
+
+
+    min = list_box->head->stored_value;
+
+    if((n_pairs+1)%4) 
+    {
+            int up_q1_ind = (int) floor((n_pairs)/4)+1;
+            int low_q1_ind = (int) floor((n_pairs)/4);
+
+            int up_q3_ind = (int) floor(3*(n_pairs)/4)+1;
+            int low_q3_ind = (int) floor(3*(n_pairs)/4);
+
+            int up_median_ind = (int) floor((n_pairs)/2)+1;
+            int low_median_ind = (int) floor((n_pairs)/2);
+
+            int low_q1, up_q1, low_q3, up_q3, up_median, low_median;
+
+            while(ptr!=NULL)
+            {
+                if(count == low_q1_ind)
+                {
+                low_q1 = ptr->stored_value;
+                }
+                if(count == up_q1_ind)
+                {
+                up_q1 = ptr->stored_value;
+                }
+                if(count == low_q3_ind)
+                {
+                low_q3 = ptr->stored_value;
+                }
+                if(count == up_q3_ind)
+                {
+                up_q3 = ptr->stored_value;
+                }
+                if(count == up_median_ind)
+                {
+                up_median = ptr->stored_value;
+                }
+                if(count == low_median_ind)
+                {
+                low_median = ptr->stored_value;
+                }
+                if(ptr->next == NULL)
+                    max = ptr->stored_value;
+
+                ptr = ptr->next;
+                count++;
+            }
+
+            Q1 = (int) (low_q1 + up_q1)/2;
+            Q3 = (int) (low_q3 + up_q3)/2;
+            median = (int) (low_median + up_median)/2;
+    }
+    else
+    {
+        int q1_index = (int) ((n_pairs+1)/4);
+        int q3_index = (int) (3*(n_pairs+1)/4);
+        int median_index = (int) ((n_pairs+1)/2);
+
+        while(ptr!=NULL)
+            {
+                if(count == q1_index)
+                {
+                Q1 = ptr->stored_value;
+                }
+                if(count == q3_index)
+                {
+                Q3 = ptr->stored_value;
+                }
+                if(count == median_index)
+                {
+                median = ptr->stored_value;
+                }
+
+                if(ptr->next == NULL)
+                    max = ptr->stored_value;
+                    
+                ptr = ptr->next;
+                count++;
+            }
     }
 
-    median = ComputeMedian(box_times, count);
-    Q1=ComputeQ1andQ3(box_times, true, count);  //True tells the function it is Q1
-    Q3 = ComputeQ1andQ3(box_times, false, count);   //False tells the function it is Q3
-    min = box_times[0];
-    max = box_times[count-1];
-
-    boxplot->median = boxplot->median+median;
-    boxplot->q1 = boxplot->q1+Q1;
-    boxplot->q3 = boxplot->q3+Q3;
-    boxplot->max = boxplot->max+max;
-    boxplot->min = boxplot->min+min;
+    printf("\nMax: %d", max);
+    printf("\nQ3: %d", Q3);
+    printf("\nMedian: %d", median);
+    printf("\nQ1: %d", Q1);
+    printf("\nMin: %d\n", min);
 
 }
 
@@ -993,24 +1207,6 @@ void printSW(int src, int dest)
 }
 
 
-void printBoxPlot()
-{
-    boxplot->max = (int) boxplot->max/10;
-    boxplot->min = (int) boxplot->min/10;
-    boxplot->median = (float) boxplot->median/10;
-    boxplot->q1 = (float) boxplot->q1/10;
-    boxplot->q3 = (float) boxplot->q3/10;
-
-    printf("=========================\n");
-    printf("  Box-Plot Statistics\n");
-    printf("=========================\n");
-    printf("Max: %d\n", boxplot->max);
-    printf("Q3: %.1f\n", boxplot->q3);
-    printf("Median: %.1f\n", boxplot->median);
-    printf("Q1: %.1f\n", boxplot->q1);
-    printf("Min: %d\n\n", boxplot->min);
-}
-
 void InterativeModeQoS(int n)
 {
     int source, dest;
@@ -1106,6 +1302,9 @@ int main(int argc, char *argv[])
 
     bool no_path = false;
     short_wide=false;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
+    int counter_pairs = 0;
+
+    list_box = initializeBoxPlot();
 
     for(int i = 0; i<nodes_count; i++)
     {
@@ -1117,11 +1316,14 @@ int main(int argc, char *argv[])
             int s = i;  //Source   (Switched with destination according to the routing messages direction)
             int d = j;  //Destination
 
+            int temp_estab = 0;
+            int width_box = 0;
+            int length_box = 0;
+
             for(int count = 0; count < 10; count++)   //10 iterations to obtain some tendency on data (Box plot)
             {
                 calendar = initializeCalendar();  //Initialize graph
                 wl = initializeNodeStates();  //Initialize node states
-                boxplot = InitializeBoxPlot(); 
 
                 sendMessages(s,d,n);  //Function responsible for sending the routing messages
 
@@ -1132,33 +1334,25 @@ int main(int argc, char *argv[])
                     break;
                 }
 
-                BoxPlot();  //Sum all the parameters to later on do the average*/
+                temp_estab = wl[d].time + temp_estab;
+                width_box = wl[d].width + width_box;
+                length_box = wl[d].length + length_box;
 
-
-               // printCalendar();
-
-                /*if(short_wide) 
-                {
-                    printf("\n=========================\n");
-                    printf("Shortest-widest order\n");
-                    printf("=========================\n");
-                }
-                else
-                {
-                    printf("\n=========================");
-                    printf("\nWidest-shortest order\n");
-                    printf("=========================\n");
-                }
-
-
-            printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);*/
 
             }
 
             if(no_path) continue;
 
+            counter_pairs++;
 
-            if(short_wide) 
+            temp_estab = temp_estab/10;
+            width_box = width_box/10;
+            length_box = length_box/10;
+            addListBox(temp_estab, width_box, length_box);
+
+
+
+            /*if(short_wide) 
             {
                 printf("\n=========================\n");
                 printf("Shortest-widest order\n");
@@ -1173,15 +1367,16 @@ int main(int argc, char *argv[])
 
 
             printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
-
-
-            printStatistics(s);
-
-            printBoxPlot();
-
-            printWS(s, d);
+            printStatistics(s);*/
+            //printWS(s, d);
 
         }
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        MergeSort(&list_box->head, i);  //Variable i defines which is the variable taken into consideration in the sorting
+        //printListBox();
+        BoxPlot(counter_pairs, i);
     }
 
     InterativeModeQoS(n);
