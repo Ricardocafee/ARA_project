@@ -377,15 +377,17 @@ void printGraph(int n)
     }
 }
 
-int readFile(struct Edge edges[])
+int readFile(struct Edge edges[], char *filename)
 {
     FILE *fp;
     int count= 0; //column counter
     int line = 0; //Line counter
-    char filename[] = "Abilene.csv";
     char c; //To store a character read from a file
     char num;
     int nodes=0;
+
+
+    filename = "file_input.csv";
 
 
     fp = fopen(filename, "r");
@@ -397,7 +399,7 @@ int readFile(struct Edge edges[])
 
     //Check if file exists
     if(fp == NULL) {
-        printf("Could not open file %s", filename);
+        printf("Could not open file %s, put the name of the file as an argument", filename);
         return 0;
     }
 
@@ -617,13 +619,16 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
     struct width_length* node_calendar;
     struct timeval t_final;
     int time;
-    bool short_wide = false;
+
     wl[s].visited=true;
 
     int width_node = wl[index].width;  //Width of the node computed based on the links to the out-neighbors
     int length_node = wl[index].length; //Length of the node computed based on the links to the out-neighbors
     int compute_width, compute_length=0;  //Variables that will compute the width and length that will be send in the routing messages
 
+    if(index == d)
+        return;
+    
 
     while (ptr != NULL)
         {   
@@ -705,9 +710,14 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
                     aux = graph->head[dest];   //Node that will send the messages
                     while(aux!=NULL)  
                     {
+                        
                         time = generateTime_inchannel();   //Generate time
                         time = time + time_;
-                        addToCalendar(time, aux->dest, dest,wl[dest].width, wl[dest].length);  //Add event to the calendar
+                        if(aux->dest != index)
+                            {
+                                addToCalendar(time, aux->dest, dest,wl[dest].width, wl[dest].length);  //Add event to the calendar
+                            }
+                        
                         aux=aux->next;   //next neighbor
                     }
                 }
@@ -994,21 +1004,99 @@ void printBoxPlot()
     printf("=========================\n");
     printf("  Box-Plot Statistics\n");
     printf("=========================\n");
-    printf("Max: %d\n", boxplot->max/10);
+    printf("Max: %d\n", boxplot->max);
     printf("Q3: %.1f\n", boxplot->q3);
     printf("Median: %.1f\n", boxplot->median);
     printf("Q1: %.1f\n", boxplot->q1);
     printf("Min: %d\n\n", boxplot->min);
 }
 
+void InterativeModeQoS(int n)
+{
+    int source, dest;
+
+    printf("\n==================================\n");
+    printf(" Interative Mode - QoS Protocol ");
+    printf("\n==================================\n");
+
+    printf("Enter the source: ");
+    scanf("%d", &dest);
+    printf("Enter the destination: ");
+    scanf("%d", &source);             //Directions swaped due to routing messages direction
+
+    short_wide=true;
+
+    for(int count = 0; count < 2; count++)  //Test the WS order and the SW order
+    {
+    
+        calendar = initializeCalendar();  //Initialize graph
+        wl = initializeNodeStates();  //Initialize node states
+
+        sendMessages(source,dest,n);  //Function responsible for sending the routing messages
+
+        if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
+        {
+            printf("\nThere is no path from %d to %d\n", dest, source);
+            return;
+        }
+
+        if(short_wide) 
+                {
+                    printf("\n=========================\n");
+                    printf("Shortest-widest order\n");
+                    printf("=========================\n");
+                }
+                else
+                {
+                    printf("\n=========================");
+                    printf("\nWidest-shortest order\n");
+                    printf("=========================\n");
+                }
+
+
+        printf("\nFrom %d to %d: (%d,%d)\n",dest,source,wl[dest].width, wl[dest].length);
+
+        short_wide=false;
+    }
+
+}
+
+
+void InterativeModeWS()
+{
+    int source, dest;
+
+    printf("\n=============================================\n");
+    printf(" Interative Mode - Widest-Shortest Algorithm ");
+    printf("\n=============================================\n");
+
+    printf("Enter the source: ");
+    scanf("%d", &dest);
+    printf("Enter the destination: ");
+    scanf("%d", &source);             //Directions swaped due to routing messages direction
+
+    short_wide=false;
+    
+    calendar = initializeCalendar();  //Initialize graph
+    wl = initializeNodeStates();  //Initialize node states
+
+    printWS(source,dest);
+
+    if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
+    {
+        printf("\nThere is no path from %d to %d\n", dest, source);
+        return;
+    }
+
+}
  
 // Directed graph implementation in C
-int main(void)
+int main(int argc, char *argv[])
 {
     struct Edge edges[MAX_EDGES];
     srand(time(NULL));
     
-    int n = readFile(edges);
+    int n = readFile(edges, argv[1]);
     wl = (struct width_length*)malloc(nodes_count * sizeof(struct width_length));
 
     graph = createGraph(edges, n, false);  //Backtrack graph
@@ -1044,18 +1132,33 @@ int main(void)
                     break;
                 }
 
-                BoxPlot();  //Sum all the parameters to later on do the average
+                BoxPlot();  //Sum all the parameters to later on do the average*/
 
 
-                //printCalendar();
+               // printCalendar();
 
+                /*if(short_wide) 
+                {
+                    printf("\n=========================\n");
+                    printf("Shortest-widest order\n");
+                    printf("=========================\n");
+                }
+                else
+                {
+                    printf("\n=========================");
+                    printf("\nWidest-shortest order\n");
+                    printf("=========================\n");
+                }
+
+
+            printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);*/
 
             }
 
             if(no_path) continue;
 
 
-            /*if(short_wide) 
+            if(short_wide) 
             {
                 printf("\n=========================\n");
                 printf("Shortest-widest order\n");
@@ -1069,17 +1172,20 @@ int main(void)
             }
 
 
-           printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);*/
+            printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
 
 
-            //printStatistics(s);
+            printStatistics(s);
 
-            //printBoxPlot();
+            printBoxPlot();
 
-            //printWS(s, d);
+            printWS(s, d);
 
         }
     }
+
+    InterativeModeQoS(n);
+    InterativeModeWS();
 
     
     return 0;
