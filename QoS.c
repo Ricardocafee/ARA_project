@@ -1364,8 +1364,6 @@ int main(int argc, char *argv[])
             printStatistics(s);
 
             printBoxPlot();
-
-            printWS(s, d);
             printStableState(s, d);
 
             printSW(s, d);
