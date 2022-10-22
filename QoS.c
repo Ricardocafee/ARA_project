@@ -9,7 +9,7 @@
 
 // Define the maximum number of vertices in the graph
 #define N 5000
-#define MAX_EDGES 100
+#define MAX_EDGES 10000
 #define SIZE 5000 //Size of the FIFO
 
 void enqueue(int item);  //Enqueue elements on the stack
@@ -73,11 +73,18 @@ struct Edge {
 };
 
 
+struct box_plot {
+    int min, max;
+    float q1, q3, median;
+};
+
+
 struct Graph *graph;     //Backwards graph
 struct Graph *graph_out;  //Original graph
 struct Calendar *calendar; //Calendar
 
 struct width_length *wl;  //Will store the width and length of the best path (According to the order) in the node
+struct box_plot* boxplot;
 
  
 // Function to create an adjacency list from specified edges
@@ -138,6 +145,19 @@ struct Graph* createGraph(struct Edge edges[], int n, bool check)
     }
  
     return graph;
+}
+
+struct box_plot* InitializeBoxPlot()
+{
+    struct box_plot* boxplot = (struct box_plot*)malloc(sizeof(struct box_plot));
+
+    boxplot->median = 0;
+    boxplot->q1 = 0;
+    boxplot->q3 = 0;
+    boxplot->max = 0;
+    boxplot->min = 0;
+
+    return boxplot;
 }
 
 struct width_length* initializeNodeStates()
@@ -396,14 +416,11 @@ int readFile(struct Edge edges[])
             continue;
         }
 
-        printf("Row: %s", buffer);
-
         token = strtok(buffer,",");
         column = 0;
     
         while(token != NULL)
         {
-            printf(" Token: %s\n", token);
 
             if(column == 0)
             {
@@ -430,38 +447,6 @@ int readFile(struct Edge edges[])
     
     }
 
-    /*while(fscanf(fp, "%d", &num) == 1) {
-
-        count = count + 1;
-        
-
-        switch (count)
-        {
-            //Store values in their corresponding fields
-        case 1:
-            edges[line].src = num;
-            break;
-        case 2:
-            edges[line].dest = num;
-            break;       
-        case 3:
-            edges[line].width = num;
-            break;
-        case 4:
-            edges[line].length = num;
-            break;
-        
-        default:
-            break;
-        }
-
-    //If 4 parameters was read, then increment number of edges read
-        if(count == 4)
-            {
-                line++;
-                count = 0;
-            }
-        }*/
 
     //Close the file
     fclose(fp);
@@ -497,7 +482,7 @@ void assign_linkOut(int source, int dest, int length, int width)
 //Function responsible for comparing the links to the out-neighbors based on the routing messages received
 //and find the best path according to the order choosen (Shortest-widest)
 
-bool compareLinks_sw(int source){  
+bool compareLinks_sw(int source, int dest){  
 
     struct Node* ptr = graph_out->head[source];
 
@@ -509,7 +494,7 @@ bool compareLinks_sw(int source){
     while(ptr != NULL)
     {
         d = ptr->dest;
-        if(wl[d].visited == false) //If that node [d] didn't received any routing message, discard
+        if(wl[d].visited == false && (d != dest)) //If that node [d] didn't received any routing message, discard
         {
             ptr = ptr->next;
             continue;
@@ -554,7 +539,7 @@ bool compareLinks_sw(int source){
 //Function responsible for comparing the links to the out-neighbors based on the routing messages received
 //and find the best path according to the order choosen (Widest-shortest)
 
-bool compareLinks_ws(int source){
+bool compareLinks_ws(int source, int dest){
 
     struct Node* ptr = graph_out->head[source];
 
@@ -562,11 +547,12 @@ bool compareLinks_ws(int source){
     int min_length;
     int wide_width;
     int d;
+    int aux = dest;
 
     while(ptr != NULL)
     {
         d = ptr->dest;
-        if(wl[d].visited == false) //If that node [d] didn't received any routing message, discard
+        if(wl[d].visited == false && (d != dest)) //If that node [d] didn't received any routing message, discard
         {
             ptr = ptr->next;
             continue;
@@ -617,9 +603,6 @@ int generateTime_inchannel()
     double time_random = uniformDistribution();
     int time_delay = (int) time_random;
 
-    //gettimeofday(&t_final, NULL);
-    //double _time = (t_final.tv_sec-t_initial.tv_sec)*1000 + (t_final.tv_usec - t_initial.tv_usec)/1000;
-    //int time_ = (int) _time;
     int time_ =  time_delay + 1000;
     return time_;
 }
@@ -634,7 +617,8 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
     struct width_length* node_calendar;
     struct timeval t_final;
     int time;
-    
+    bool short_wide = false;
+    wl[s].visited=true;
 
     int width_node = wl[index].width;  //Width of the node computed based on the links to the out-neighbors
     int length_node = wl[index].length; //Length of the node computed based on the links to the out-neighbors
@@ -648,6 +632,8 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
                 ptr=ptr->next;
                 continue;
             }
+
+
             
             bool check = false;  //Will verify if status of node has changed
             compute_length = wl[index].length+ptr->length; //Length's sum between out-neighbor and link
@@ -692,7 +678,10 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
 
                     time= time + time_;
 
-                    addToCalendar(time, aux->dest, dest, wl[dest].width, wl[dest].length);  //Add event to the calendar
+                    if(aux->dest != index)
+                    {
+                        addToCalendar(time, aux->dest, dest, wl[dest].width, wl[dest].length);  //Add event to the calendar
+                    }
                     aux = aux->next; //Add next event
     
                 }
@@ -703,11 +692,11 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
                 
                 if(short_wide)  //For Shortest_widest order
                 {
-                    check = compareLinks_sw(dest);
+                    check = compareLinks_sw(dest, s);
                 }
                 else    //For Widest-shortest order
                 {
-                    check = compareLinks_ws(dest);
+                    check = compareLinks_ws(dest, s);
                 }
 
                 if(check)
@@ -772,16 +761,16 @@ void printCalendar()
 {
     struct width_length* ptr = calendar->head;
 
-    /*printf("\n===========\n");
+    printf("\n===========\n");
     printf("Calendar\n");
-    printf("===========\n");*/
+    printf("===========\n");
 
 
-    /*while(ptr!=NULL)
+    while(ptr!=NULL)
     {
         printf("\nSource: %d, Destination: %d, Width: %d, Length: %d, Time: %d\n",ptr->source, ptr->dest, ptr->width, ptr->length, ptr->time);
         ptr=ptr->next;
-    }*/
+    }
 
    
 
@@ -872,28 +861,26 @@ void BoxPlot()
     }
 
     median = ComputeMedian(box_times, count);
-    Q1 = ComputeQ1andQ3(box_times, true, count);  //True tells the function it is Q1
+    Q1=ComputeQ1andQ3(box_times, true, count);  //True tells the function it is Q1
     Q3 = ComputeQ1andQ3(box_times, false, count);   //False tells the function it is Q3
     min = box_times[0];
     max = box_times[count-1];
 
-    /*printf("=========================\n");
-    printf("  Box-Plot Statistics\n");
-    printf("=========================\n");
-    printf("Max: %d\n", max);
-    printf("Q3: %.1f\n", Q3);
-    printf("Median: %.1f\n", median);
-    printf("Q1: %.1f\n", Q1);
-    printf("Min: %d\n\n", min);*/
+    boxplot->median = boxplot->median+median;
+    boxplot->q1 = boxplot->q1+Q1;
+    boxplot->q3 = boxplot->q3+Q3;
+    boxplot->max = boxplot->max+max;
+    boxplot->min = boxplot->min+min;
+
 }
 
 
 void printStatistics(int src)
 {
 
-    /*printf("\n===========\n");
+    printf("\n===========\n");
     printf("Statistics\n");
-    printf("===========\n\n");*/
+    printf("===========\n\n");
 
 
     for(int i=0; i < nodes_count ; i++){
@@ -980,10 +967,10 @@ void printWS(int src, int dest)
         
     }
 
-    /*printf("=========================\n");
+    printf("=========================\n");
     printf("Widest Shortest Algorithm\n");
     printf("  From %d to %d: (%d,%d)    \n",dest, src, wl[dest].width, wl[dest].length);
-    printf("==========================\n");*/
+    printf("==========================\n");
 
 }
 
@@ -996,73 +983,100 @@ void printSW(int src, int dest)
 }
 
 
+void printBoxPlot()
+{
+    boxplot->max = (int) boxplot->max/10;
+    boxplot->min = (int) boxplot->min/10;
+    boxplot->median = (float) boxplot->median/10;
+    boxplot->q1 = (float) boxplot->q1/10;
+    boxplot->q3 = (float) boxplot->q3/10;
+
+    printf("=========================\n");
+    printf("  Box-Plot Statistics\n");
+    printf("=========================\n");
+    printf("Max: %d\n", boxplot->max/10);
+    printf("Q3: %.1f\n", boxplot->q3);
+    printf("Median: %.1f\n", boxplot->median);
+    printf("Q1: %.1f\n", boxplot->q1);
+    printf("Min: %d\n\n", boxplot->min);
+}
+
  
 // Directed graph implementation in C
 int main(void)
 {
-
     struct Edge edges[MAX_EDGES];
     srand(time(NULL));
     
-    //Read file and extract number of edges
     int n = readFile(edges);
-
     wl = (struct width_length*)malloc(nodes_count * sizeof(struct width_length));
-    
-    // construct a graph from the given edges
+
     graph = createGraph(edges, n, false);  //Backtrack graph
     graph_out = createGraph(edges, n, true);   //Original graph
-    
-    // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
-    printGraph(n);
+      
+    printGraph(n);  // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
 
+    bool no_path = false;
+    short_wide=false;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
 
     for(int i = 0; i<nodes_count; i++)
     {
         for(int j = 0; j<nodes_count; j++)
         {
             if(i == j) continue;
-
-            calendar = initializeCalendar();  //Initialize graph
-            wl = initializeNodeStates();
+            no_path = false;   
 
             int s = i;  //Source   (Switched with destination according to the routing messages direction)
             int d = j;  //Destination
-            short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
 
-            sendMessages(s,d,n);  //Function responsible for sending the routing messages
-
-
-            if((wl[d].length==0 || wl[d].length==99999) && (wl[d].width==0))
+            for(int count = 0; count < 10; count++)   //10 iterations to obtain some tendency on data (Box plot)
             {
-                //printf("\nThere is no path from %d to %d\n", d, s);
-                continue;
+                calendar = initializeCalendar();  //Initialize graph
+                wl = initializeNodeStates();  //Initialize node states
+                boxplot = InitializeBoxPlot(); 
+
+                sendMessages(s,d,n);  //Function responsible for sending the routing messages
+
+                if((wl[d].length==0 || wl[d].length==99999) && (wl[d].width==0))
+                {
+                    printf("\nThere is no path from %d to %d\n", d, s);
+                    no_path = true;
+                    break;
+                }
+
+                BoxPlot();  //Sum all the parameters to later on do the average
+
+
+                //printCalendar();
+
+
             }
 
-            if(short_wide) 
+            if(no_path) continue;
+
+
+            /*if(short_wide) 
             {
-                /*printf("\n=========================\n");
+                printf("\n=========================\n");
                 printf("Shortest-widest order\n");
-                printf("=========================\n");*/
+                printf("=========================\n");
             }
             else
             {
-                /*printf("\n=========================");
+                printf("\n=========================");
                 printf("\nWidest-shortest order\n");
-                printf("=========================\n");*/
+                printf("=========================\n");
             }
 
 
-           //printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
+           printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);*/
 
 
-            printCalendar();
+            //printStatistics(s);
 
-            printStatistics(s);
+            //printBoxPlot();
 
-            BoxPlot();
-
-            printWS(s, d);
+            //printWS(s, d);
 
         }
     }
