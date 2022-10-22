@@ -1295,7 +1295,7 @@ void printSW(int src, int dest)
 
         while (aux!=NULL)
         {
-            if ((wl[aux->dest].length > (wl[current].length + aux->length)) && (wl[aux->dest].width == maxWidth))
+            if ((wl[aux->dest].length > (wl[current].length + aux->length)) && (aux->width == maxWidth))
             {
                 wl[aux->dest].length = wl[current].length + aux->length;
             }
