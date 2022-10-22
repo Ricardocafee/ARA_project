@@ -1198,12 +1198,117 @@ void printWS(int src, int dest)
 
 }
 
+int greatestWidth()
+{
+    int maxWidth=0, maxnode=0;
+
+    for(int i=0; i<nodes_count; i++){
+        if(wl[i].visited==false && wl[i].width > maxWidth){
+            maxWidth = wl[i].width;
+            maxnode = i;
+        }
+    }
+
+    return maxnode;
+
+}
+
+//dijkstra algorithm to find the widest path between source and destination
+int findMaxWidth(int src, int dest)
+{
+    struct Node* aux;
+
+    //wl reset
+    for(int i = 0 ; i < nodes_count ; i++){
+        wl[i].visited = false;
+        wl[i].length = 99999;
+        wl[i].width = 0;
+        wl[i].prev = NULL;
+    }
+
+    wl[src].length=0;
+    wl[src].width=99999;
+
+    int nodes_left = nodes_count, current = 0;    
+
+    while(nodes_left > 0){
+        current = greatestWidth();  //pick the node with the greatest width among the rest
+        if(current==dest){
+            return wl[current].width;  //if the node picked is the destination, then its width is the greatest along the path
+        }
+        wl[current].visited=true;
+        nodes_left--;
+        aux = graph->head[current];
+
+        while (aux!=NULL)
+        {
+            if (wl[aux->dest].width < (minWidth(wl[current].width, aux->width)))
+            {
+                wl[aux->dest].length = wl[current].length + aux->length;
+                wl[aux->dest].width = minWidth(wl[current].width, aux->width);
+            }
+            else if(wl[aux->dest].width == (minWidth(wl[current].width, aux->width)) && (wl[aux->dest].length > (wl[current].length + aux->length)))
+            {
+                wl[aux->dest].length = wl[current].length + aux->length;
+            }
+
+            aux=aux->next;
+            
+        }
+
+    }
+}
+
+
 void printSW(int src, int dest)
 {
+    struct Node* aux;
+    int maxWidth = 0;
 
+    //get the maximum width possible between source and destination
+    maxWidth = findMaxWidth(src, dest);
 
+    //wl reset for dijkstra algorithm, but capped widthwise
+    for(int i = 0 ; i < nodes_count ; i++){
+        wl[i].visited = false;
+        wl[i].length = 99999;
+        if(wl[i].width > maxWidth){
+            wl[i].width = maxWidth;
+        } 
+        wl[i].prev = NULL;
+    }
 
+    wl[src].length=0;
+    wl[src].width=9999;
 
+    int nodes_left = nodes_count, current = 0;    
+
+    //general dijkstra where only the edges within the range of the max width are considered
+    while(nodes_left > 0){
+        current = lessLength();
+        if(current==dest){
+            break;
+        }
+        wl[current].visited=true;
+        nodes_left--;
+        aux = graph->head[current];
+
+        while (aux!=NULL)
+        {
+            if ((wl[aux->dest].length > (wl[current].length + aux->length)) && (wl[aux->dest].width == maxWidth))
+            {
+                wl[aux->dest].length = wl[current].length + aux->length;
+            }
+
+            aux=aux->next;
+            
+        }
+    }
+
+    printf("=========================\n");
+    printf("Shortest Widest Algorithm\n");
+    printf("  From %d to %d: (%d,%d)    \n",dest, src, wl[dest].width, wl[dest].length);
+    printf("==========================\n");
 }
 
 
@@ -1272,9 +1377,7 @@ void InterativeModeWS()
     scanf("%d", &source);             //Directions swaped due to routing messages direction
 
     short_wide=false;
-    
-    calendar = initializeCalendar();  //Initialize graph
-    wl = initializeNodeStates();  //Initialize node states
+
 
     printWS(source,dest);
 
@@ -1285,6 +1388,31 @@ void InterativeModeWS()
     }
 
 }
+
+void InterativeModeSW()
+{
+    int source, dest;
+
+    printf("\n=============================================\n");
+    printf(" Interative Mode - Shortest-Widest Algorithm ");
+    printf("\n=============================================\n");
+
+    printf("Enter the source: ");
+    scanf("%d", &dest);
+    printf("Enter the destination: ");
+    scanf("%d", &source);             //Directions swaped due to routing messages direction
+
+
+    printSW(source,dest);
+
+    if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
+    {
+        printf("\nThere is no path from %d to %d\n", dest, source);
+        return;
+    }
+
+}
+ 
  
 // Directed graph implementation in C
 int main(int argc, char *argv[])
@@ -1350,8 +1478,6 @@ int main(int argc, char *argv[])
             length_box = length_box/10;
             addListBox(temp_estab, width_box, length_box);
 
-
-
             /*if(short_wide) 
             {
                 printf("\n=========================\n");
@@ -1369,7 +1495,6 @@ int main(int argc, char *argv[])
             printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
             printStatistics(s);*/
             //printWS(s, d);
-
         }
     }
     for (int i = 0; i < 3; i++)
