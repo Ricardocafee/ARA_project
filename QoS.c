@@ -1003,7 +1003,7 @@ void BoxPlot(int n_pairs, int i, char* type)
     int min=0, max=0;
 
     printf("\n===================================\n");
-    printf("  Box Plot: %s    ", type); 
+    printf("  Box Plot: %s   ", type); 
     if(i == 0)
     {
         printf("Stabilization Times\n");
@@ -1534,16 +1534,31 @@ int main(int argc, char *argv[])
 {
     struct Edge edges[MAX_EDGES];
     srand(time(NULL));
+    bool short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
     
     int n = readFile(edges, argv[1]);
     wl = (struct width_length*)malloc(nodes_count * sizeof(struct width_length));
+
+    if((strcmp(argv[2],"SW")==0) || (strcmp(argv[2],"sw")==0)){
+        short_wide=true;
+    }else if((strcmp(argv[2],"WS")==0) || (strcmp(argv[2],"ws")==0)){
+        short_wide=false;
+    }else{
+        printf("ERROR: Invalid input!");
+        return 0;
+    }
+
+    if(argc!=3){
+        printf("ERROR: Invalid number of inputs!");
+        return 0;
+    }
 
     graph = createGraph(edges, n, false);  //Backtrack graph
     graph_out = createGraph(edges, n, true);   //Original graph
     printGraph(n);  // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
 
     bool no_path = false;
-    bool short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
+    
     int counter_pairs = 0;
 
     int temp_estab = 0;
@@ -1718,7 +1733,7 @@ int main(int argc, char *argv[])
     {
         MergeSort(&list_box->head, i+1);  //Variable i defines which is the variable taken into consideration in the sorting
         //printListBox();
-        BoxPlot(counter_pairs, i+1, " SW Algorithm ");
+        BoxPlot(counter_pairs, i+1, " SW Algorithm");
     }
 
     InterativeModeQoS(n);
