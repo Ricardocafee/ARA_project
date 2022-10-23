@@ -34,7 +34,7 @@ double uniformDistribution()   //Uniform Distribution for delay
 struct Graph
 {
     // An array of pointers to Node to represent an adjacency list
-    struct Node *head[N];
+    struct Node **head;
 };
 
 struct Calendar
@@ -99,14 +99,18 @@ struct Graph* createGraph(struct Edge edges[], int n, bool check)
 {
     // allocate storage for the graph data structure
     
-    struct Graph* graph = (struct Graph*)malloc(sizeof(struct Graph));
+    struct Graph* new_graph = (struct Graph*)malloc(sizeof(struct Graph));
+    new_graph->head = malloc(nodes_count * sizeof(struct Node*));
+
+    for (int i = 0; i < nodes_count; i++) {
+            new_graph->head[i]=NULL;
+    }
   
  
     // initialize head pointer for all vertices
     if(check == false)
     {
         for (int i = 0; i < nodes_count; i++) {
-            graph->head[i] = NULL;
             wl[i].visited=false;
             wl[i].length=0;
             wl[i].width=0;
@@ -145,13 +149,13 @@ struct Graph* createGraph(struct Edge edges[], int n, bool check)
         newNode->length = length;
  
         // point new node to the current head
-        newNode->next = graph->head[src];
+        newNode->next = new_graph->head[src];
  
         // point head pointer to the new node
-        graph->head[src] = newNode;
+        new_graph->head[src] = newNode;
     }
  
-    return graph;
+    return new_graph;
 }
 
 
@@ -189,6 +193,7 @@ void insertNode(struct width_length* new_node)  //Insert node at the end of the 
     calendar->tail->next=new_node;
     new_node->prev =calendar->tail;
     calendar->tail=new_node;
+    new_node->next=NULL;
 }
 
 //Insert node in the middle of the calendar
@@ -201,6 +206,21 @@ void insertmiddleNode(struct width_length* new_node, struct width_length* tail, 
     tail->prev=new_node;
 }
 
+void calendarFree()
+{
+    struct width_length* aux1 = calendar->head;
+    struct width_length* aux2 = calendar->head;
+
+    while(aux1->next!=NULL){
+        aux2=aux1->next;
+        free(aux1);
+        aux1=aux2;
+    }
+    free(aux1);
+    free(calendar);
+
+}
+
 //Add element to the calendar and put it its correspondent order
 
 void addToCalendar(int time, int dest, int index, int width, int length)
@@ -211,16 +231,20 @@ void addToCalendar(int time, int dest, int index, int width, int length)
     new_node->dest = dest;
     new_node->source =index;
     new_node->time=time;
+    new_node->visited=false;
 
     struct width_length* tail = calendar->tail;
     struct width_length* prev_tail;
     struct width_length* head_ = calendar->head;
 
 
-    if(calendar->head == NULL)
+    if(calendar->head == NULL && calendar->tail==NULL)
     {
         calendar->head=new_node;
         calendar->tail=new_node;
+        new_node->next = NULL;
+        new_node->prev=NULL;
+
         return;
     }
     else if(calendar->head == calendar->tail)
@@ -240,9 +264,10 @@ void addToCalendar(int time, int dest, int index, int width, int length)
         }
         else
         {
+            calendar->head->prev= new_node;
             new_node->next=calendar->head;
             calendar->head = new_node;
-            calendar->tail->prev = new_node;
+            new_node->prev=NULL;
             return;
         }
     }
@@ -289,6 +314,7 @@ void addToCalendar(int time, int dest, int index, int width, int length)
                     new_node->next = calendar->head->next;
                     calendar->head->next->prev = new_node;
                     calendar->head->next=new_node;
+                    new_node->time=tail->time+50;
                     return;
                 }
                 else if(new_node->time < calendar->head->time)
@@ -317,10 +343,7 @@ void addToCalendar(int time, int dest, int index, int width, int length)
 
                // printf("\nTwo messages in same link asdas\n");
                 new_node->time = tail->prev->time+50;
-                if(new_node->time >= tail->prev->time)
-                {
-                    new_node->time = tail->prev->time - 1;
-                }
+
                 insertmiddleNode(new_node, tail, tail->prev);
                 return;
             }
@@ -448,14 +471,17 @@ void MergeSort(struct box_parameters** headRef, int i)
 // Function to print adjacency list representation of a graph
 void printGraph(int n)
 {
+    struct Node* ptr = NULL;
+    int i=0;
+
     //Firstly, the backtrack graph
     printf("\nBacktrack Graph\n");
 
-    for (int i = 0; i < n; i++)
+    for (i = 0; i < nodes_count; i++)
     {
 
         // print current vertex and all its neighbors
-        struct Node* ptr = graph->head[i];
+        ptr = graph->head[i];
 
 
         if(ptr==NULL && i > 0) continue;
@@ -474,11 +500,11 @@ void printGraph(int n)
     //Secondly, the original graph
     printf("\nOriginal Graph\n");
 
-    for (int i = 0; i < n; i++)
+    for (i = 0; i < nodes_count; i++)
     {
 
         // print current vertex and all its neighbors
-        struct Node* ptr = graph_out->head[i];
+        ptr = graph_out->head[i];
 
 
         if(ptr==NULL && i > 0) continue;
@@ -496,11 +522,6 @@ void printGraph(int n)
 int readFile(struct Edge edges[], char *filename)
 {
     FILE *fp;
-    int count= 0; //column counter
-    int line = 0; //Line counter
-    char c; //To store a character read from a file
-    char num;
-    int nodes=0;
 
 
     filename = "Abilene.csv";
@@ -739,7 +760,6 @@ bool compareLinks_ws(int index, int dest, int source){
 
 int generateTime_inchannel()
 {
-    struct timeval t_final;
     double time_random = uniformDistribution();
     int time_delay = (int) time_random;
 
@@ -754,14 +774,12 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
 
     struct Node* ptr = graph->head[index];
     struct Node* aux;
-    struct width_length* node_calendar;
     struct timeval t_final;
     int time;
 
     wl[s].visited=true;
 
-    int width_node = wl[index].width;  //Width of the node computed based on the links to the out-neighbors
-    int length_node = wl[index].length; //Length of the node computed based on the links to the out-neighbors
+
     int compute_width, compute_length=0;  //Variables that will compute the width and length that will be send in the routing messages
 
     bool check;
@@ -882,27 +900,24 @@ void sendMessages(int source, int dest_final, int n){
 
     int time, d;
     int index;
-    struct timeval interval_time;
 
     struct Node* ptr = graph->head[source];
-    struct width_length* node_extracted;
 
     while (ptr!=NULL)  //Initial case: Root node send routing messages to the in-neighbors
     {
         d = ptr->dest;  //In-neighbor
         time = generateTime_inchannel();  //Time spent in the channel (delay + unit of time)
-        addToCalendar(time, d, source, 999999, 0);  //Add event to the calendar
+        addToCalendar(time, d, source, 99999, 0);  //Add event to the calendar
         ptr=ptr->next;  //Next in-neighbor
     }
 
     struct width_length* varying_head = calendar->head; //Ptr that will tranverse the calendar while event are being removed
     
-    bool cont = true;
+
     int time_;
 
-    while(cont) //While nodes are not in a stable state
+    while(varying_head!=NULL) //While nodes are not in a stable state
     {   
-        if(varying_head==NULL) break;
         //waitTime(varying_head->time);  //Wait until the next event
         index = varying_head->source;  //Node that will send the message
         d = varying_head->dest;  //Node that will receive the message
@@ -1100,7 +1115,7 @@ int minWidth(int a, int b)
 
 int lessLength()
 {
-    int minlength=9999, minnode=0, maxwidth=0;
+    int minlength=99999, minnode=0, maxwidth=0;
 
     for(int i=0; i<nodes_count; i++){
         if(wl[i].visited==false && wl[i].length < minlength){
@@ -1128,7 +1143,6 @@ void printWS_stablestate(int src, int dest)
         wl[i].visited = false;
         wl[i].length = 99999;
         wl[i].width = 0;
-        wl[i].prev = NULL;
     }
 
     wl[src].length=0;
@@ -1196,7 +1210,6 @@ int findMaxWidth(int src, int dest)
         wl[i].visited = false;
         wl[i].length = 99999;
         wl[i].width = 0;
-        wl[i].prev = NULL;
     }
 
     wl[src].length=0;
@@ -1247,8 +1260,7 @@ void printSW(int src, int dest)
         wl[i].length = 99999;
         if(wl[i].width > maxWidth){
             wl[i].width = maxWidth;
-        } 
-        wl[i].prev = NULL;
+        }
     }
 
     wl[src].length=0;
@@ -1294,7 +1306,6 @@ void printSW_stablestate(int src, int dest)
         wl[i].visited = false;
         wl[i].length = 99999;
         wl[i].width = 0;
-        wl[i].prev = NULL;
     }
 
     wl[src].length=0;
@@ -1348,7 +1359,7 @@ void printStableState(int src, int dest)
 
 void InterativeModeQoS(int n)
 {
-    int source, dest;
+    int source=0, dest=0;
 
     printf("\n==================================\n");
     printf(" Interative Mode - QoS Protocol ");
@@ -1359,7 +1370,7 @@ void InterativeModeQoS(int n)
     printf("Enter the destination: ");
     scanf("%d", &source);             //Directions swaped due to routing messages direction
 
-    short_wide=false;
+    short_wide=true;
 
     for(int count = 0; count < 2; count++)  //Test the WS order and the SW order
     {
@@ -1369,9 +1380,12 @@ void InterativeModeQoS(int n)
 
         sendMessages(source,dest,n);  //Function responsible for sending the routing messages
 
+        calendarFree();
+
         if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
         {
             printf("\nThere is no path from %d to %d\n", dest, source);
+            
             return;
         }
 
@@ -1450,6 +1464,36 @@ void InterativeModeSW()
     printf("\nFrom %d to %d: (%d,%d)\n",dest,source,wl[dest].width, wl[dest].length);
 
 }
+
+void freeGraphs()
+{
+    struct Node* aux1 = NULL;
+    struct Node* aux2 = NULL;
+
+
+    for(int i=0;i<nodes_count;i++){
+        aux1 = graph->head[i];
+        while(aux1!=NULL){
+            aux2=aux1->next;
+            free(aux1);
+            aux1=aux2;
+        }
+    }
+    free(graph->head);
+    free(graph);
+
+    for(int i=0;i<nodes_count;i++){
+        aux1 = graph_out->head[i];
+        while(aux1!=NULL){
+            aux2=aux1->next;
+            free(aux1);
+            aux1=aux2;
+        }
+    }
+    free(graph_out->head);
+    free(graph_out);
+}
+
  
  
 // Directed graph implementation in C
@@ -1463,7 +1507,6 @@ int main(int argc, char *argv[])
 
     graph = createGraph(edges, n, false);  //Backtrack graph
     graph_out = createGraph(edges, n, true);   //Original graph
-      
     printGraph(n);  // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
 
     bool no_path = false;
@@ -1479,7 +1522,6 @@ int main(int argc, char *argv[])
 
 
     list_box = initializeBoxPlot();
-    calendar = initializeCalendar();  //Initialize graph
 
     for(int i = 0; i<nodes_count; i++)
     {
@@ -1495,7 +1537,7 @@ int main(int argc, char *argv[])
             width_box = 0;
             length_box = 0;
 
-            for(int count = 0; count < 10; count++)   //10 iterations to obtain some tendency on data (Box plot)
+            for(int count = 0; count < 1; count++)   //10 iterations to obtain some tendency on data (Box plot)
             {
                 calendar = initializeCalendar();  //Initialize graph
                 wl = initializeNodeStates();  //Initialize node states
@@ -1511,7 +1553,9 @@ int main(int argc, char *argv[])
 
                 temp_estab = wl[d].time + temp_estab;
                 width_box = wl[d].width + width_box;
-                length_box = wl[d].length + length_box;              
+                length_box = wl[d].length + length_box;
+                
+                calendarFree();
 
             }
 
@@ -1519,9 +1563,9 @@ int main(int argc, char *argv[])
 
             counter_pairs++;
 
-            temp_estab = temp_estab/10;
-            width_box = width_box/10;
-            length_box = length_box/10;
+            temp_estab = temp_estab/1;
+            width_box = width_box/1;
+            length_box = length_box/1;
             addListBox(temp_estab, width_box, length_box);
 
             /*if(short_wide) 
@@ -1600,6 +1644,9 @@ int main(int argc, char *argv[])
     InterativeModeQoS(n);
     InterativeModeWS();
     InterativeModeSW();
+
+    free(wl);
+    freeGraphs();
     
     return 0;
 }
