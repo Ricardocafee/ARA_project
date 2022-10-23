@@ -1495,6 +1495,35 @@ void InterativeModeSW()
     }
 
 }
+
+void freeGraphs()
+{
+    struct Node* aux1 = NULL;
+    struct Node* aux2 = NULL;
+
+
+    for(int i=0;i<nodes_count;i++){
+        aux1 = graph->head[i];
+        while(aux1!=NULL){
+            aux2=aux1->next;
+            free(aux1);
+            aux1=aux2;
+        }
+    }
+    free(graph->head);
+    free(graph);
+
+    for(int i=0;i<nodes_count;i++){
+        aux1 = graph_out->head[i];
+        while(aux1!=NULL){
+            aux2=aux1->next;
+            free(aux1);
+            aux1=aux2;
+        }
+    }
+    free(graph_out->head);
+    free(graph_out);
+}
  
  
 // Directed graph implementation in C
@@ -1594,6 +1623,7 @@ int main(int argc, char *argv[])
     InterativeModeSW();
 
     free(wl);
+    freeGraphs();
     
     return 0;
 }
