@@ -1535,23 +1535,27 @@ int main(int argc, char *argv[])
     struct Edge edges[MAX_EDGES];
     srand(time(NULL));
     bool short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
-    
-    int n = readFile(edges, argv[1]);
-    wl = (struct width_length*)malloc(nodes_count * sizeof(struct width_length));
 
+    if(argc!=3){
+        printf("ERROR: Invalid number of inputs!\n");
+        printf("Expected: ./QoS [filename] [ws/sw]\n");
+        return 0;
+    }
+    
     if((strcmp(argv[2],"SW")==0) || (strcmp(argv[2],"sw")==0)){
         short_wide=true;
     }else if((strcmp(argv[2],"WS")==0) || (strcmp(argv[2],"ws")==0)){
         short_wide=false;
     }else{
-        printf("ERROR: Invalid input!");
+        printf("ERROR: Invalid input!\n");
         return 0;
     }
 
-    if(argc!=3){
-        printf("ERROR: Invalid number of inputs!");
-        return 0;
-    }
+
+    int n = readFile(edges, argv[1]);
+    wl = (struct width_length*)malloc(nodes_count * sizeof(struct width_length));
+
+    
 
     graph = createGraph(edges, n, false);  //Backtrack graph
     graph_out = createGraph(edges, n, true);   //Original graph
