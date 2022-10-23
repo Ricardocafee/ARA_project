@@ -13,5 +13,5 @@ make
 Just run the executable on the terminal
 
 ```bash
-./QoS
+./QoS <name of the file>
 ```
