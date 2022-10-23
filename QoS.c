@@ -221,6 +221,20 @@ void calendarFree()
 
 }
 
+void BoxPlotFree()
+{
+    struct box_parameters* aux1 = list_box->head;
+    struct width_length* aux2 = list_box->head;
+
+    while(aux1->next!=NULL){
+        aux2=aux1->next;
+        free(aux1);
+        aux1=aux2;
+    }
+    free(aux1);
+    free(list_box);
+}
+
 //Add element to the calendar and put it its correspondent order
 
 void addToCalendar(int time, int dest, int index, int width, int length)
@@ -1595,6 +1609,8 @@ int main(int argc, char *argv[])
         printListBox();
         BoxPlot(counter_pairs, i);
     }
+
+    BoxPlotFree(list_box);
 
     counter_pairs = 0;
     list_box = initializeBoxPlot();
