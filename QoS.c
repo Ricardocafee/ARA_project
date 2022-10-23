@@ -1559,7 +1559,7 @@ int main(int argc, char *argv[])
 
     graph = createGraph(edges, n, false);  //Backtrack graph
     graph_out = createGraph(edges, n, true);   //Original graph
-    printGraph(n);  // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
+    // printGraph(n);  // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
 
     bool no_path = false;
     
@@ -1621,21 +1621,9 @@ int main(int argc, char *argv[])
             length_box = length_box/10;
             addListBox(temp_estab, width_box, length_box);
 
-            /*if(short_wide) 
-            {
-                printf("\n=========================\n");
-                printf("Shortest-widest order\n");
-                printf("=========================\n");
-            }
-            else
-            {
-                printf("\n=========================");
-                printf("\nWidest-shortest order\n");
-                printf("=========================\n");
-            }
+            
 
-            */
-            printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
+            // printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
             //printStatistics(s);
             //printWS(s, d);
             //printStableState(s, d);
