@@ -8,7 +8,6 @@
 #include <string.h>
 
 // Define the maximum number of vertices in the graph
-#define N 5000
 #define MAX_EDGES 100000
 #define SIZE 5000 //Size of the FIFO
 
@@ -20,7 +19,7 @@ int Rear = -1; //index of top of the FIFO
 int Front = -1; //index of bottom of the FIFO
 int inp_arr[SIZE]; //FIFO
 int no_solutions=0;
-bool short_wide = false;  //False - Widest-shortest; True - Shortest-widest
+// bool short_wide = false;  //False - Widest-shortest; True - Shortest-widest
 
 struct timeval t_initial; 
 bool path_found = false;
@@ -234,8 +233,6 @@ void addToCalendar(int time, int dest, int index, int width, int length)
     new_node->visited=false;
 
     struct width_length* tail = calendar->tail;
-    struct width_length* prev_tail;
-    struct width_length* head_ = calendar->head;
 
 
     if(calendar->head == NULL && calendar->tail==NULL)
@@ -621,86 +618,14 @@ void assign_linkOut(int source, int dest, int length, int width)
 //Function responsible for comparing the links to the out-neighbors based on the routing messages received
 //and find the best path according to the order choosen (Shortest-widest)
 
-bool compareLinks_sw(int index, int dest, int source, int aux){  
+bool compareLinks_sw(int index, int dest, int source){  
 
     struct Node* ptr = graph_out->head[index];
 
-    int i = 0;
-    int min_length;
-    int wide_width;
-    int d;
-
-
-    while(ptr != NULL)
-    {
-
-        d = ptr->dest;
-
-
-        if(wl[d].visited == false && (d != dest)) //If that node [d] didn't received any routing message, discard
-        {
-            ptr = ptr->next;
-            continue;
-        }
-        else if(d == aux)
-        {
-            ptr = ptr->next;
-            continue;
-        }
-
-        if(i == 0 && d != source) //If it is the first link analyzed, assign its length and width to the node
-        {
-            min_length = ptr->length;
-            wide_width = ptr->width;
-            i = i+1;
-            ptr = ptr->next;
-            continue;
-        }
-
-        //Comparison between links. 
-        if(ptr->width > wide_width && d != source)  //Maximum width is prioritized
-        {
-            min_length=ptr->length;
-            wide_width=ptr->width;
-        }
-        else if(ptr->width == wide_width && d != source) //In case of equality, choose the shortest one
-        {
-            if(ptr->length < min_length)
-            {
-                min_length = ptr->length;
-            }
-        }
-        ptr = ptr->next;
-    }
-
-    //In case any of the attributes was changed, update its state and inform the in-neighbors
-
-    
-
-    if(wl[index].length != min_length || wl[index].width != wide_width)
-    {
-        wl[index].length = min_length;
-
-        wl[index].width = wide_width;
-
-
-        return true;
-    }
-
-    return false; //Otherwise, state will remain the same
-}
-
-//Function responsible for comparing the links to the out-neighbors based on the routing messages received
-//and find the best path according to the order choosen (Widest-shortest)
-
-bool compareLinks_ws(int index, int dest, int source){
-
-    struct Node* ptr = graph_out->head[index];
-
-    int i = 0;
-    int min_length;
-    int wide_width;
-    int d;
+    bool first=true;
+    int min_length=99999;
+    int wide_width=0;
+    int d=0;
     int aux = dest;
 
 
@@ -719,11 +644,78 @@ bool compareLinks_ws(int index, int dest, int source){
         }
         
 
-        if(i == 0 && d != source)  //If it is the first link analyzed, assign its length and width to the node
+        if(first && d != source)  //If it is the first link analyzed, assign its length and width to the node
         {
             min_length = ptr->length;
             wide_width = ptr->width;
-            i = i+1;
+            first = false;
+            ptr = ptr->next;
+            continue;
+        }
+
+        //Comparison between links. 
+        if(ptr->width > wide_width && d != source)  //Shortest path is prioritized
+        {
+            min_length=ptr->length;
+            wide_width=ptr->width;
+        }
+        else if(ptr->width == wide_width && d != source)  //In case of equality, choose the widest one
+        {
+            if(ptr->length < min_length)
+            {
+                min_length = ptr->length;
+            }
+        }
+        ptr = ptr->next;
+    }
+
+
+    //Function responsible for comparing the links to the out-neighbors based on the routing messages received
+    //and find the best path according to the order choosen (Widest-shortest)
+
+    if(wl[index].width < wide_width || (wl[index].width == wide_width && wl[index].length > min_length))
+    {
+        wl[index].length = min_length;
+        wl[index].width = wide_width;
+        return true;
+    }
+    else return false;
+}
+
+//Function responsible for comparing the links to the out-neighbors based on the routing messages received
+//and find the best path according to the order choosen (Widest-shortest)
+
+bool compareLinks_ws(int index, int dest, int source){
+
+    struct Node* ptr = graph_out->head[index];
+
+    bool first = true;
+    int min_length=99999;
+    int wide_width=0;
+    int d=0;
+    int aux = dest;
+
+
+    while(ptr != NULL)
+    {
+        d = ptr->dest;
+        if(wl[d].visited == false && (d != dest)) //If that node [d] didn't received any routing message, discard
+        {
+            ptr = ptr->next;
+            continue;
+        }
+        else if(d == aux)
+        {
+            ptr = ptr->next;
+            continue;
+        }
+        
+
+        if(first && d != source)  //If it is the first link analyzed, assign its length and width to the node
+        {
+            min_length = ptr->length;
+            wide_width = ptr->width;
+            first = false;
             ptr = ptr->next;
             continue;
         }
@@ -770,19 +762,16 @@ int generateTime_inchannel()
 
 //Main function responsible for the sending and receiving of routing message and state's update of nodes
 
-void shortest_widest(int index, int dest, int s, int d, int time_){
+void shortest_widest(int index, int dest, int s, int d, int time_, bool short_wide){
 
     struct Node* ptr = graph->head[index];
     struct Node* aux;
-    struct timeval t_final;
     int time;
 
     wl[s].visited=true;
 
 
-    int compute_width, compute_length=0;  //Variables that will compute the width and length that will be send in the routing messages
-
-    bool check;
+    int compute_width=0, compute_length=0;  //Variables that will compute the width and length that will be send in the routing messages
 
     while (ptr != NULL)
         {   
@@ -821,8 +810,6 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
             //Assign these parameters to the links of the original graph
             //Later on, they will be compared to find the best path
 
-
-
             assign_linkOut(dest, index, compute_length, compute_width);   
 
 
@@ -859,7 +846,7 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
                 
                 if(short_wide)  //For Shortest_widest order
                 {
-                    check = compareLinks_sw(dest, s, d, index);
+                    check = compareLinks_sw(dest, s, d);
                     
                 }
                 else    //For Widest-shortest order
@@ -896,18 +883,18 @@ void shortest_widest(int index, int dest, int s, int d, int time_){
 
 
 //Function responsible for sending routing messages for all the in-neighbors
-void sendMessages(int source, int dest_final, int n){
+void sendMessages(int source, int dest_final, int n, bool short_wide){
 
-    int time, d;
-    int index;
+    int time=0;
+    int index=0;
+    int d=0;
 
     struct Node* ptr = graph->head[source];
 
     while (ptr!=NULL)  //Initial case: Root node send routing messages to the in-neighbors
     {
-        d = ptr->dest;  //In-neighbor
         time = generateTime_inchannel();  //Time spent in the channel (delay + unit of time)
-        addToCalendar(time, d, source, 99999, 0);  //Add event to the calendar
+        addToCalendar(time, ptr->dest, source, 99999, 0);  //Add event to the calendar
         ptr=ptr->next;  //Next in-neighbor
     }
 
@@ -922,8 +909,7 @@ void sendMessages(int source, int dest_final, int n){
         index = varying_head->source;  //Node that will send the message
         d = varying_head->dest;  //Node that will receive the message
         time_ = varying_head->time;
-        shortest_widest(index, d,source, dest_final, time_);
-
+        shortest_widest(index, d,source, dest_final, time_, short_wide);      
         varying_head=varying_head->next;  //Next neighbor
     }
 
@@ -977,8 +963,8 @@ void BoxPlot(int n_pairs, int i)
 
     int count = 1;
 
-    int median, Q1, Q3; //Boxplot parameters
-    int min, max;
+    int median=0, Q1=0, Q3=0; //Boxplot parameters
+    int min=0, max=0;
 
     printf("\n===================================\n");
     printf("  Box Plot: ");
@@ -1243,6 +1229,8 @@ int findMaxWidth(int src, int dest)
         }
 
     }
+
+    return 0;
 }
 
 
@@ -1347,7 +1335,7 @@ void printSW_stablestate(int src, int dest)
 }
 
 //Stable State Algorithm
-void printStableState(int src, int dest)
+void printStableState(int src, int dest, bool short_wide)
 {
     if(short_wide){
         printSW_stablestate(src, dest);
@@ -1370,43 +1358,38 @@ void InterativeModeQoS(int n)
     printf("Enter the destination: ");
     scanf("%d", &source);             //Directions swaped due to routing messages direction
 
-    short_wide=true;
 
-    for(int count = 0; count < 2; count++)  //Test the WS order and the SW order
+    calendar = initializeCalendar();  //Initialize graph
+    wl = initializeNodeStates();  //Initialize node states
+    sendMessages(source,dest,n, false);  //Function responsible for sending the routing messages
+    calendarFree();
+    if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
     {
-    
-        calendar = initializeCalendar();  //Initialize graph
-        wl = initializeNodeStates();  //Initialize node states
-
-        sendMessages(source,dest,n);  //Function responsible for sending the routing messages
-
-        calendarFree();
-
-        if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
-        {
-            printf("\nThere is no path from %d to %d\n", dest, source);
-            
-            return;
-        }
-
-        if(short_wide) 
-                {
-                    printf("\n=========================\n");
-                    printf("Shortest-widest order\n");
-                    printf("=========================\n");
-                }
-                else
-                {
-                    printf("\n=========================");
-                    printf("\nWidest-shortest order\n");
-                    printf("=========================\n");
-                }
-
-
-        printf("\nFrom %d to %d: (%d,%d)\n",dest,source,wl[dest].width, wl[dest].length);
-
-        short_wide=false;
+        printf("\nThere is no path from %d to %d\n", dest, source);        
+        return;
     }
+
+    printf("\n=======================");
+    printf("\nWidest-shortest order\n");
+    printf("=======================\n");
+
+    printf("\nFrom %d to %d: (%d,%d)\n",dest,source,wl[dest].width, wl[dest].length);
+
+    calendar = initializeCalendar();  //Initialize graph
+    wl = initializeNodeStates();  //Initialize node states
+    sendMessages(source,dest,n, true);  //Function responsible for sending the routing messages
+    calendarFree();
+    if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
+    {
+        printf("\nThere is no path from %d to %d\n", dest, source);        
+        return;
+    }
+
+    printf("\n=======================");
+    printf("\nShortest-Widest order\n");
+    printf("=======================\n");
+
+    printf("\nFrom %d to %d: (%d,%d)\n",dest,source,wl[dest].width, wl[dest].length);
 
 }
 
@@ -1415,16 +1398,14 @@ void InterativeModeWS()
 {
     int source, dest;
 
-    printf("\n=============================================\n");
-    printf(" Interative Mode - Widest-Shortest Algorithm ");
-    printf("\n=============================================\n");
+    printf("\n================================================\n");
+    printf(" Interative Mode - Widest-Shortest Stable State ");
+    printf("\n================================================\n");
 
     printf("Enter the source: ");
     scanf("%d", &dest);
     printf("Enter the destination: ");
     scanf("%d", &source);             //Directions swaped due to routing messages direction
-
-    short_wide=false;
 
 
     printWS_stablestate(source,dest);
@@ -1443,9 +1424,9 @@ void InterativeModeSW()
 {
     int source, dest;
 
-    printf("\n=============================================\n");
-    printf(" Interative Mode - Shortest-Widest Algorithm ");
-    printf("\n=============================================\n");
+    printf("\n================================================\n");
+    printf(" Interative Mode - Shortest-Widest Stable State ");
+    printf("\n================================================\n");
 
     printf("Enter the source: ");
     scanf("%d", &dest);
@@ -1494,6 +1475,21 @@ void freeGraphs()
     free(graph_out);
 }
 
+void freeListBox()
+{
+    struct box_parameters* aux1 = list_box->head;
+    struct box_parameters* aux2 = list_box->head;
+
+    while(aux1->next!=NULL){
+        aux2=aux1->next;
+        free(aux1);
+        aux1=aux2;
+    }
+    free(aux1);
+    free(list_box);
+
+}
+
  
  
 // Directed graph implementation in C
@@ -1510,15 +1506,15 @@ int main(int argc, char *argv[])
     printGraph(n);  // Function to print adjacency list representation of a graph, Backtrack graph since routing messages have opposite direction to the links
 
     bool no_path = false;
-    short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
+    bool short_wide=true;  //Define the order; Shortest_widest -> True, Widest-shortest -> False
     int counter_pairs = 0;
 
     int temp_estab = 0;
     int width_box = 0;
     int length_box = 0;
 
-    int s;
-    int d;
+    int s=0;
+    int d=0;
 
 
     list_box = initializeBoxPlot();
@@ -1537,12 +1533,12 @@ int main(int argc, char *argv[])
             width_box = 0;
             length_box = 0;
 
-            for(int count = 0; count < 1; count++)   //10 iterations to obtain some tendency on data (Box plot)
+            for(int count = 0; count < 10; count++)   //10 iterations to obtain some tendency on data (Box plot)
             {
                 calendar = initializeCalendar();  //Initialize graph
                 wl = initializeNodeStates();  //Initialize node states
 
-                sendMessages(s,d,n);  //Function responsible for sending the routing messages
+                sendMessages(s,d,n, short_wide);  //Function responsible for sending the routing messages
 
                 if((wl[d].length==0 || wl[d].length==99999) && (wl[d].width==0))
                 {
@@ -1563,9 +1559,9 @@ int main(int argc, char *argv[])
 
             counter_pairs++;
 
-            temp_estab = temp_estab/1;
-            width_box = width_box/1;
-            length_box = length_box/1;
+            temp_estab = temp_estab/10;
+            width_box = width_box/10;
+            length_box = length_box/10;
             addListBox(temp_estab, width_box, length_box);
 
             /*if(short_wide) 
@@ -1581,7 +1577,7 @@ int main(int argc, char *argv[])
                 printf("=========================\n");
             }
 
-*/
+            */
             printf("\nFrom %d to %d: (%d,%d)\n",d,s,wl[d].width, wl[d].length);
             //printStatistics(s);
             //printWS(s, d);
@@ -1595,6 +1591,8 @@ int main(int argc, char *argv[])
         printListBox();
         BoxPlot(counter_pairs, i);
     }
+
+    freeListBox();
 
     counter_pairs = 0;
     list_box = initializeBoxPlot();
@@ -1614,7 +1612,7 @@ int main(int argc, char *argv[])
             length_box = 0;
             wl = initializeNodeStates();  //Initialize node states
 
-            printStableState(i, j);
+            printStableState(i, j, short_wide);
 
             if((wl[d].length==0 || wl[d].length==99999) && (wl[d].width==0))
                 {
@@ -1647,6 +1645,7 @@ int main(int argc, char *argv[])
 
     free(wl);
     freeGraphs();
+    freeListBox();
     
     return 0;
 }
