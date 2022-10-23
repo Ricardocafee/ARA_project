@@ -51,6 +51,7 @@ struct Box_plot
 struct Node
 {
     int dest, width, length;
+    bool check;
     struct Node* next;
 };
 
@@ -146,6 +147,7 @@ struct Graph* createGraph(struct Edge edges[], int n, bool check)
         newNode->dest = dest;
         newNode->width = width;
         newNode->length = length;
+        newNode->check=false;
  
         // point new node to the current head
         newNode->next = new_graph->head[src];
@@ -218,6 +220,26 @@ void calendarFree()
     free(aux1);
     free(calendar);
 
+}
+
+
+void initializeLinks()
+{
+
+    struct Node* ptr = NULL;
+    int i=0;
+
+    for (i = 0; i < nodes_count; i++)
+    {
+        // print current vertex and all its neighbors
+        ptr = graph_out->head[i];
+
+        while (ptr != NULL)
+        {                      
+            ptr->check=false;
+            ptr = ptr->next;
+        }
+    }
 }
 
 
@@ -522,7 +544,7 @@ int readFile(struct Edge edges[], char *filename)
     FILE *fp;
 
 
-    filename = "Abilene.csv";
+    //filename = "AS1239.csv";
 
 
     fp = fopen(filename, "r");
@@ -610,6 +632,7 @@ void assign_linkOut(int source, int dest, int length, int width)
         {
             ptr->length=length;
             ptr->width=width;
+            ptr->check=true;
             break;
         }
         ptr=ptr->next;
@@ -630,6 +653,7 @@ bool compareLinks_sw(int index, int dest, int source){
     int aux = dest;
 
 
+
     while(ptr != NULL)
     {
         d = ptr->dest;
@@ -641,6 +665,12 @@ bool compareLinks_sw(int index, int dest, int source){
         else if(d == aux)
         {
             ptr = ptr->next;
+            continue;
+        }
+
+        if(ptr->check==false)
+        {
+            ptr= ptr->next;
             continue;
         }
         
@@ -670,7 +700,7 @@ bool compareLinks_sw(int index, int dest, int source){
         ptr = ptr->next;
     }
 
-
+    
     //Function responsible for comparing the links to the out-neighbors based on the routing messages received
     //and find the best path according to the order choosen (Widest-shortest)
 
@@ -711,6 +741,11 @@ bool compareLinks_ws(int index, int dest, int source){
             continue;
         }
         
+        if(ptr->check==false)
+        {
+            ptr=ptr->next;
+            continue;
+        }
 
         if(first && d != source)  //If it is the first link analyzed, assign its length and width to the node
         {
@@ -958,7 +993,7 @@ void printListBox()
 
 
 
-void BoxPlot(int n_pairs, int i)
+void BoxPlot(int n_pairs, int i, char* type)
 {
     struct box_parameters* ptr = list_box->head;
 
@@ -968,7 +1003,7 @@ void BoxPlot(int n_pairs, int i)
     int min=0, max=0;
 
     printf("\n===================================\n");
-    printf("  Box Plot: ");
+    printf("  Box Plot: %s    ", type); 
     if(i == 0)
     {
         printf("Stabilization Times\n");
@@ -1269,7 +1304,7 @@ void printSW(int src, int dest)
 
         while (aux!=NULL)
         {
-            if ((wl[aux->dest].length > (wl[current].length + aux->length)) && (aux->width == maxWidth))
+            if ((wl[aux->dest].length > (wl[current].length + aux->length)) && (wl[aux->dest].width == maxWidth))
             {
                 wl[aux->dest].length = wl[current].length + aux->length;
             }
@@ -1362,6 +1397,7 @@ void InterativeModeQoS(int n)
 
     calendar = initializeCalendar();  //Initialize graph
     wl = initializeNodeStates();  //Initialize node states
+    initializeLinks();   
     sendMessages(source,dest,n, false);  //Function responsible for sending the routing messages
     calendarFree();
     if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
@@ -1378,6 +1414,7 @@ void InterativeModeQoS(int n)
 
     calendar = initializeCalendar();  //Initialize graph
     wl = initializeNodeStates();  //Initialize node states
+   
     sendMessages(source,dest,n, true);  //Function responsible for sending the routing messages
     calendarFree();
     if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
@@ -1408,7 +1445,7 @@ void InterativeModeWS()
     printf("Enter the destination: ");
     scanf("%d", &source);             //Directions swaped due to routing messages direction
 
-
+    initializeLinks(); 
     printWS_stablestate(source,dest);
 
     if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
@@ -1434,7 +1471,7 @@ void InterativeModeSW()
     printf("Enter the destination: ");
     scanf("%d", &source);             //Directions swaped due to routing messages direction
 
-
+    initializeLinks(); 
     printSW_stablestate(source,dest);
 
     if((wl[dest].length==0 || wl[dest].length==99999) && (wl[dest].width==0))
@@ -1491,7 +1528,6 @@ void freeListBox()
 
 }
 
- 
  
 // Directed graph implementation in C
 int main(int argc, char *argv[])
@@ -1551,7 +1587,8 @@ int main(int argc, char *argv[])
                 temp_estab = wl[d].time + temp_estab;
                 width_box = wl[d].width + width_box;
                 length_box = wl[d].length + length_box;
-                
+
+                initializeLinks();              
                 calendarFree();
 
             }
@@ -1589,8 +1626,8 @@ int main(int argc, char *argv[])
         for (int i = 0; i < 3; i++)
     {
         MergeSort(&list_box->head, i);  //Variable i defines which is the variable taken into consideration in the sorting
-        printListBox();
-        BoxPlot(counter_pairs, i);
+        //printListBox();
+        BoxPlot(counter_pairs, i, "QoS");
     }
 
     freeListBox();
@@ -1621,10 +1658,10 @@ int main(int argc, char *argv[])
                     continue;
                 }
 
-            temp_estab = wl[d].time + temp_estab;
             width_box = wl[d].width + width_box;
             length_box = wl[d].length + length_box;
             counter_pairs++;
+            initializeLinks();    
 
             addListBox(temp_estab, width_box, length_box);
         }
@@ -1636,9 +1673,53 @@ int main(int argc, char *argv[])
     {
         MergeSort(&list_box->head, i+1);  //Variable i defines which is the variable taken into consideration in the sorting
         //printListBox();
-        BoxPlot(counter_pairs, i+1);
+        BoxPlot(counter_pairs, i+1, "Stable-State");
     }
 
+    freeListBox();
+
+    counter_pairs = 0;
+    list_box = initializeBoxPlot();
+
+    for(int i = 0; i < nodes_count; i++)
+    {
+        for(int j = 0; j < nodes_count; j++)
+        {
+            if(i == j)
+                continue;
+
+            s = i;
+            d = j;
+
+            temp_estab = 0;
+            width_box = 0;
+            length_box = 0;
+
+            printSW(i, j);
+
+            if((wl[d].length==0 || wl[d].length==99999) && (wl[d].width==0))
+                {
+                    no_path = true;
+                    continue;
+                }
+
+            width_box = wl[d].width + width_box;
+            length_box = wl[d].length + length_box;
+            counter_pairs++;
+            initializeLinks();    
+
+            addListBox(temp_estab, width_box, length_box);
+        }
+    }
+
+
+
+    for (int i = 0; i < 2; i++)
+    {
+        MergeSort(&list_box->head, i+1);  //Variable i defines which is the variable taken into consideration in the sorting
+        //printListBox();
+        BoxPlot(counter_pairs, i+1, " SW Algorithm ");
+    }
 
     InterativeModeQoS(n);
     InterativeModeWS();
